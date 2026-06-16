@@ -131,7 +131,7 @@ export async function getTaskComments(taskId) {
   return data
 }
 
-export async function addTaskComment({ taskId, userId, body, projectId, taskTitle }) {
+export async function addTaskComment({ taskId, userId, body, projectId, taskTitle, taskAssigneeId, taskCreatedBy, members }) {
   const { error } = await supabase
     .from('task_comments')
     .insert({ task_id: taskId, user_id: userId, body })
@@ -144,6 +144,35 @@ export async function addTaskComment({ taskId, userId, body, projectId, taskTitl
     action: 'comment_added',
     metadata: { task_id: taskId, title: taskTitle },
   })
+
+  // notify the assignee and the task creator (if not the commenter, and not duplicated)
+  const notifyTargets = new Set([taskAssigneeId, taskCreatedBy].filter((id) => id && id !== userId))
+
+  for (const targetId of notifyTargets) {
+    await createNotification({
+      userId: targetId,
+      projectId,
+      taskId,
+      actorId: userId,
+      type: 'comment',
+      message: `commented on "${taskTitle}"`,
+    })
+  }
+
+  // notify anyone @mentioned in the comment text, if not already notified above
+  const mentioned = extractMentions(body, members || [])
+  for (const member of mentioned) {
+    if (!notifyTargets.has(member.id) && member.id !== userId) {
+      await createNotification({
+        userId: member.id,
+        projectId,
+        taskId,
+        actorId: userId,
+        type: 'mention',
+        message: `mentioned you in a comment on "${taskTitle}"`,
+      })
+    }
+  }
 }
 
 export async function updateTaskAssignee({ taskId, assigneeId, projectId, actorId, taskTitle, assigneeName }) {
@@ -160,6 +189,17 @@ export async function updateTaskAssignee({ taskId, assigneeId, projectId, actorI
     action: assigneeId ? 'task_assigned' : 'task_unassigned',
     metadata: { task_id: taskId, title: taskTitle, assignee: assigneeName || null },
   })
+
+  if (assigneeId) {
+    await createNotification({
+      userId: assigneeId,
+      projectId,
+      taskId,
+      actorId,
+      type: 'assigned',
+      message: `assigned you to "${taskTitle}"`,
+    })
+  }
 }
 
 export async function updateTaskDescription({ taskId, description }) {
@@ -302,4 +342,151 @@ export async function getTaskActivity(projectId, taskId) {
 
   if (error) throw error
   return data
+}
+
+export function extractMentions(text, members) {
+  const mentioned = []
+  for (const member of members) {
+    if (!member.full_name) continue
+    const pattern = new RegExp(`@${member.full_name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i')
+    if (pattern.test(text)) {
+      mentioned.push(member)
+    }
+  }
+  return mentioned
+}
+
+export async function createNotification({ userId, projectId, taskId, actorId, type, message }) {
+  if (userId === actorId) return // never notify yourself about your own action
+
+  const { error } = await supabase
+    .from('notifications')
+    .insert({ user_id: userId, project_id: projectId, task_id: taskId, actor_id: actorId, type, message })
+
+  if (error) console.error('Failed to create notification:', error)
+}
+
+export async function getMyNotifications() {
+  const { data, error } = await supabase
+    .from('notifications')
+    .select('*, profiles!notifications_actor_id_fkey(full_name)')
+    .order('created_at', { ascending: false })
+    .limit(50)
+
+  if (error) throw error
+  return data
+}
+
+export async function markNotificationRead(notificationId) {
+  const { error } = await supabase
+    .from('notifications')
+    .update({ read: true })
+    .eq('id', notificationId)
+
+  if (error) throw error
+}
+
+export async function markAllNotificationsRead() {
+  const { error } = await supabase
+    .from('notifications')
+    .update({ read: true })
+    .eq('read', false)
+
+  if (error) throw error
+}
+
+export async function createInvite({ orgId, createdBy, role = 'member', maxUses = 1, expiresInDays = 7 }) {
+  const token = crypto.randomUUID().replace(/-/g, '')
+  const expiresAt = expiresInDays
+    ? new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000).toISOString()
+    : null
+
+  const { data, error } = await supabase
+    .from('invites')
+    .insert({ org_id: orgId, token, created_by: createdBy, role, max_uses: maxUses, expires_at: expiresAt })
+    .select()
+    .single()
+
+  if (error) throw error
+  return data
+}
+
+export async function redeemInvite({ token, userId }) {
+  const { data, error } = await supabase.rpc('redeem_invite', {
+    invite_token: token,
+    redeeming_user_id: userId,
+  })
+
+  if (error) throw error
+  if (!data.success) throw new Error(data.error)
+  return data
+}
+
+
+export async function updateTaskPriority({ taskId, priority }) {
+  const { error } = await supabase
+    .from('tasks')
+    .update({ priority, updated_at: new Date().toISOString() })
+    .eq('id', taskId)
+
+  if (error) throw error
+}
+
+export async function getProjectLabels(projectId) {
+  const { data, error } = await supabase
+    .from('labels')
+    .select('*')
+    .eq('project_id', projectId)
+    .order('created_at', { ascending: true })
+
+  if (error) throw error
+  return data
+}
+
+export async function createLabel({ projectId, name, color }) {
+  const { data, error } = await supabase
+    .from('labels')
+    .insert({ project_id: projectId, name, color })
+    .select()
+    .single()
+
+  if (error) throw error
+  return data
+}
+
+export async function getTaskLabels(taskId) {
+  const { data, error } = await supabase
+    .from('task_labels')
+    .select('label_id, labels(*)')
+    .eq('task_id', taskId)
+
+  if (error) throw error
+  return data.map((tl) => tl.labels)
+}
+
+export async function getAllTaskLabels(projectId) {
+  // fetch label assignments for every task in a project at once, for showing labels on board cards
+  const { data, error } = await supabase
+    .from('task_labels')
+    .select('task_id, labels(*)')
+    .in('task_id', (await supabase.from('tasks').select('id').eq('project_id', projectId)).data?.map((t) => t.id) || [])
+
+  if (error) throw error
+
+  const byTask = {}
+  for (const row of data) {
+    if (!byTask[row.task_id]) byTask[row.task_id] = []
+    byTask[row.task_id].push(row.labels)
+  }
+  return byTask
+}
+
+export async function addLabelToTask({ taskId, labelId }) {
+  const { error } = await supabase.from('task_labels').insert({ task_id: taskId, label_id: labelId })
+  if (error) throw error
+}
+
+export async function removeLabelFromTask({ taskId, labelId }) {
+  const { error } = await supabase.from('task_labels').delete().eq('task_id', taskId).eq('label_id', labelId)
+  if (error) throw error
 }

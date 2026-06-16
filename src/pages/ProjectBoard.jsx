@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
+import { getProjectLabels } from '../lib/data'
 import {
   DndContext,
   closestCorners,
@@ -20,6 +21,7 @@ import TaskDetailPanel from './TaskDetailPanel'
 import { getMyOrg, getTasks, createTask, updateTaskPosition, getProjectMembers } from '../lib/data'
 import { useAuth } from '../lib/AuthContext'
 import { supabase } from '../lib/supabase'
+import { getAllTaskLabels } from '../lib/data'
 
 const COLUMNS = [
   { key: 'todo', label: 'To Do' },
@@ -28,7 +30,14 @@ const COLUMNS = [
   { key: 'done', label: 'Done' },
 ]
 
-function TaskCard({ task, onClick }) {
+const PRIORITY_STYLES = {
+  low: { color: 'text-slate-muted', label: 'Low' },
+  medium: { color: 'text-violet', label: 'Medium' },
+  high: { color: 'text-orange-600', label: 'High' },
+  urgent: { color: 'text-red-600', label: 'Urgent' },
+}
+
+function TaskCard({ task, onClick, labels }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: task.id,
   })
@@ -40,6 +49,7 @@ function TaskCard({ task, onClick }) {
   }
 
   const isOverdue = task.due_date && task.status !== 'done' && new Date(task.due_date) < new Date(new Date().toDateString())
+  const priorityStyle = PRIORITY_STYLES[task.priority] || PRIORITY_STYLES.medium
 
   return (
     <motion.div
@@ -54,18 +64,36 @@ function TaskCard({ task, onClick }) {
         task.status === 'done' ? 'border-l-2 border-l-sage' : ''
       }`}
     >
-      <p className="text-sm font-medium text-ink">{task.title}</p>
-      {task.due_date && (
-        <p className={`font-mono text-[10px] uppercase tracking-wide mt-1.5 ${isOverdue ? 'text-red-600' : 'text-slate-muted'}`}>
-          {isOverdue ? 'Overdue · ' : 'Due '}
-          {new Date(task.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-        </p>
+      {labels && labels.length > 0 && (
+        <div className="flex flex-wrap gap-1 mb-1.5">
+          {labels.map((label) => (
+            <span
+              key={label.id}
+              className="text-[9px] font-mono uppercase tracking-wide px-1.5 py-0.5 rounded"
+              style={{ backgroundColor: `${label.color}1A`, color: label.color }}
+            >
+              {label.name}
+            </span>
+          ))}
+        </div>
       )}
+      <p className="text-sm font-medium text-ink">{task.title}</p>
+      <div className="flex items-center gap-2 mt-1.5">
+        {task.due_date && (
+          <p className={`font-mono text-[10px] uppercase tracking-wide ${isOverdue ? 'text-red-600' : 'text-slate-muted'}`}>
+            {isOverdue ? 'Overdue · ' : 'Due '}
+            {new Date(task.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+          </p>
+        )}
+        <span className={`font-mono text-[10px] uppercase tracking-wide ${priorityStyle.color}`}>
+          {priorityStyle.label}
+        </span>
+      </div>
     </motion.div>
   )
 }
 
-function Column({ column, tasks, onTaskClick }) {
+function Column({ column, tasks, onTaskClick, taskLabels }) {
   const { setNodeRef } = useDroppable({ id: column.key })
 
   return (
@@ -77,7 +105,7 @@ function Column({ column, tasks, onTaskClick }) {
         <div ref={setNodeRef} className="min-h-[200px]">
           <AnimatePresence initial={false} mode="popLayout">
             {tasks.map((task) => (
-              <TaskCard key={task.id} task={task} onClick={onTaskClick} />
+              <TaskCard key={task.id} task={task} onClick={onTaskClick} labels={taskLabels[task.id]} />
             ))}
           </AnimatePresence>
         </div>
@@ -98,6 +126,12 @@ export default function ProjectBoard() {
   const [selectedTask, setSelectedTask] = useState(null)
   const [orgPlan, setOrgPlan] = useState(null)
   const [activeDragTask, setActiveDragTask] = useState(null)
+  const [taskLabels, setTaskLabels] = useState({})
+  const [filterAssignee, setFilterAssignee] = useState('')
+  const [filterPriority, setFilterPriority] = useState('')
+  const [filterLabel, setFilterLabel] = useState('')
+  const [showFilters, setShowFilters] = useState(false)
+  const [projectLabels, setProjectLabels] = useState([])
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
 
@@ -105,6 +139,8 @@ export default function ProjectBoard() {
     loadTasks()
     getProjectMembers(projectId).then(setMembers).catch((err) => setError(err.message))
     getMyOrg().then(({ org }) => setOrgPlan(org.plan)).catch((err) => setError(err.message))
+    getAllTaskLabels(projectId).then(setTaskLabels).catch((err) => setError(err.message))
+    getProjectLabels(projectId).then(setProjectLabels).catch((err) => setError(err.message))
 
     const channel = supabase
       .channel(`tasks-${projectId}`)
@@ -161,9 +197,10 @@ export default function ProjectBoard() {
 
     if (!targetStatus) return
 
+    
     const columnTasks = tasks
-      .filter((t) => t.status === targetStatus && t.id !== activeTask.id)
-      .sort((a, b) => a.position - b.position)
+    .filter((t) => t.status === targetStatus && t.id !== activeTask.id)
+    .sort((a, b) => a.position - b.position)
 
     const overIndex = overTask ? columnTasks.findIndex((t) => t.id === overTask.id) : columnTasks.length
 
@@ -203,7 +240,17 @@ export default function ProjectBoard() {
       <div className="p-8 text-slate-muted font-mono text-xs uppercase tracking-wider">Loading board...</div>
     )
   }
+function matchesFilters(task) {
+  if (filterAssignee && task.assignee_id !== filterAssignee) return false
+  if (filterPriority && task.priority !== filterPriority) return false
+  if (filterLabel) {
+    const labels = taskLabels[task.id] || []
+    if (!labels.some((l) => l.id === filterLabel)) return false
+  }
+  return true
+}
 
+const hasActiveFilters = filterAssignee || filterPriority || filterLabel
   return (
     <div className="min-h-screen bg-paper p-6">
       {error && (
@@ -215,7 +262,67 @@ export default function ProjectBoard() {
           {error}
         </motion.div>
       )}
+    <div className="mb-4 flex items-center gap-2 flex-wrap">
+  <button
+    onClick={() => setShowFilters(!showFilters)}
+    className={`text-sm rounded-lg px-3 py-1.5 border transition-colors ${
+      hasActiveFilters ? 'bg-violet text-white border-violet' : 'border-black/10 text-slate-muted hover:text-ink'
+    }`}
+  >
+    Filters {hasActiveFilters && '·'}
+  </button>
 
+  {showFilters && (
+    <>
+      <select
+        value={filterAssignee}
+        onChange={(e) => setFilterAssignee(e.target.value)}
+        className="text-sm rounded-lg border border-black/10 px-2 py-1.5 bg-white"
+      >
+        <option value="">All assignees</option>
+        {members.map((m) => (
+          <option key={m.id} value={m.id}>{m.full_name || m.id}</option>
+        ))}
+      </select>
+
+      <select
+        value={filterPriority}
+        onChange={(e) => setFilterPriority(e.target.value)}
+        className="text-sm rounded-lg border border-black/10 px-2 py-1.5 bg-white"
+      >
+        <option value="">All priorities</option>
+        <option value="low">Low</option>
+        <option value="medium">Medium</option>
+        <option value="high">High</option>
+        <option value="urgent">Urgent</option>
+      </select>
+
+      <select
+        value={filterLabel}
+        onChange={(e) => setFilterLabel(e.target.value)}
+        className="text-sm rounded-lg border border-black/10 px-2 py-1.5 bg-white"
+      >
+        <option value="">All labels</option>
+        {projectLabels.map((l) => (
+          <option key={l.id} value={l.id}>{l.name}</option>
+        ))}
+      </select>
+    </>
+  )}
+
+  {hasActiveFilters && (
+    <button
+      onClick={() => {
+        setFilterAssignee('')
+        setFilterPriority('')
+        setFilterLabel('')
+      }}
+      className="text-sm text-slate-muted hover:text-ink"
+    >
+      Clear
+    </button>
+  )}
+</div>
       <DndContext
         sensors={sensors}
         collisionDetection={closestCorners}
@@ -226,6 +333,7 @@ export default function ProjectBoard() {
           {COLUMNS.map((column, colIdx) => {
             const columnTasks = tasks
               .filter((t) => t.status === column.key)
+              .filter(matchesFilters)
               .sort((a, b) => a.position - b.position)
 
             return (
@@ -235,7 +343,7 @@ export default function ProjectBoard() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.35, delay: colIdx * 0.06 }}
               >
-                <Column column={column} tasks={columnTasks} onTaskClick={setSelectedTask} />
+                <Column column={column} tasks={columnTasks} onTaskClick={setSelectedTask} taskLabels={taskLabels} />
                 <div className="w-72 mt-2">
                   {addingTo === column.key ? (
                     <div className="flex gap-1">

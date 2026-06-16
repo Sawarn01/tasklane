@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '../lib/AuthContext'
 import { getMyOrg, getMyProjects, createProject } from '../lib/data'
 import { signOut } from '../lib/auth'
+import { createInvite } from '../lib/data'
 
 export default function Dashboard() {
   const { user } = useAuth()
@@ -16,6 +17,9 @@ export default function Dashboard() {
   const [showNewProject, setShowNewProject] = useState(false)
   const [newProjectName, setNewProjectName] = useState('')
   const [creating, setCreating] = useState(false)
+  const [inviteLink, setInviteLink] = useState('')
+  const [generatingInvite, setGeneratingInvite] = useState(false)
+  const [copySuccess, setCopySuccess] = useState(false)
 
   useEffect(() => {
     loadData()
@@ -36,6 +40,27 @@ export default function Dashboard() {
       setLoading(false)
     }
   }
+
+  async function handleGenerateInvite() {
+  setGeneratingInvite(true)
+  setError('')
+  try {
+    const invite = await createInvite({ orgId: org.id, createdBy: user.id })
+    const link = `${window.location.origin}/signup?invite=${invite.token}`
+    setInviteLink(link)
+    setCopySuccess(false)
+  } catch (err) {
+    setError(err.message)
+  } finally {
+    setGeneratingInvite(false)
+  }
+}
+
+async function handleCopyInvite() {
+  await navigator.clipboard.writeText(inviteLink)
+  setCopySuccess(true)
+  setTimeout(() => setCopySuccess(false), 2000)
+}
 
   async function handleCreateProject(e) {
     e.preventDefault()
@@ -96,6 +121,38 @@ export default function Dashboard() {
             Manage billing →
           </button>
         </div>
+
+        {(role === 'owner' || role === 'admin') && (
+            <div className="mt-3 px-4">
+                {!inviteLink ? (
+                    <button
+                    onClick={handleGenerateInvite}
+                    disabled={generatingInvite}
+                    className="text-xs text-violet hover:opacity-70 transition-opacity disabled:opacity-50"
+                    >
+                        {generatingInvite ? 'Generating...' : '+ Invite teammate'}
+                    </button>
+        ) : (
+      <div className="bg-paper-dim rounded-lg p-2 mt-1">
+        <p className="font-mono text-[9px] text-slate-muted uppercase tracking-wide mb-1">Invite link (1 use)</p>
+        <div className="flex items-center gap-1">
+          <input
+            readOnly
+            value={inviteLink}
+            className="flex-1 text-[10px] bg-white rounded px-1.5 py-1 border border-black/5 truncate"
+            onClick={(e) => e.target.select()}
+          />
+          <button
+            onClick={handleCopyInvite}
+            className="text-[10px] bg-violet text-white rounded px-2 py-1 flex-shrink-0 hover:bg-violet/90 transition-colors"
+          >
+            {copySuccess ? '✓' : 'Copy'}
+          </button>
+        </div>
+      </div>
+    )}
+  </div>
+)}
 
         <div className="flex-1 overflow-y-auto p-3">
           <div className="flex items-center justify-between mb-2 px-1">

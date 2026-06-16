@@ -15,6 +15,14 @@ import { supabase } from '../lib/supabase'
 import { updateTaskDueDate } from '../lib/data'
 import { getTaskActivity } from '../lib/data'
 import { formatActivity } from '../lib/activityFormat'
+import {
+  updateTaskPriority,
+  getProjectLabels,
+  createLabel,
+  getTaskLabels,
+  addLabelToTask,
+  removeLabelFromTask,
+} from '../lib/data'
 
 export default function TaskDetailPanel({ task, members, orgPlan, onClose, onTaskUpdated }) {
   const { user } = useAuth()
@@ -28,12 +36,19 @@ export default function TaskDetailPanel({ task, members, orgPlan, onClose, onTas
   const [dueDate, setDueDate] = useState(task.due_date || '')
   const [savingDueDate, setSavingDueDate] = useState(false)
   const [taskActivity, setTaskActivity] = useState([])
+  const [priority, setPriority] = useState(task.priority || 'medium')
+  const [savingPriority, setSavingPriority] = useState(false)
+  const [projectLabels, setProjectLabels] = useState([])
+  const [taskLabelList, setTaskLabelList] = useState([])
+  const [showLabelPicker, setShowLabelPicker] = useState(false)
+  const [newLabelName, setNewLabelName] = useState('')
 
 
   useEffect(() => {
     loadComments()
     loadFiles()
     loadTaskActivity()
+    loadLabels()
 
     const channel = supabase
       .channel(`task-comments-${task.id}`)
@@ -77,6 +92,64 @@ export default function TaskDetailPanel({ task, members, orgPlan, onClose, onTas
     setError(err.message)
   }
 }
+async function loadLabels() {
+  try {
+    const [allLabels, attached] = await Promise.all([
+      getProjectLabels(task.project_id),
+      getTaskLabels(task.id),
+    ])
+    setProjectLabels(allLabels)
+    setTaskLabelList(attached)
+  } catch (err) {
+    setError(err.message)
+  }
+}
+
+async function handlePriorityChange(e) {
+  const value = e.target.value
+  setPriority(value)
+  setSavingPriority(true)
+  try {
+    await updateTaskPriority({ taskId: task.id, priority: value })
+    onTaskUpdated()
+  } catch (err) {
+    setError(err.message)
+  } finally {
+    setSavingPriority(false)
+  }
+}
+
+async function handleToggleLabel(label) {
+  const isAttached = taskLabelList.some((l) => l.id === label.id)
+  try {
+    if (isAttached) {
+      await removeLabelFromTask({ taskId: task.id, labelId: label.id })
+    } else {
+      await addLabelToTask({ taskId: task.id, labelId: label.id })
+    }
+    await loadLabels()
+    onTaskUpdated()
+  } catch (err) {
+    setError(err.message)
+  }
+}
+
+const LABEL_COLORS = ['#6E56CF', '#36D399', '#F59E0B', '#EF4444', '#3B82F6']
+
+async function handleCreateLabel(e) {
+  e.preventDefault()
+  if (!newLabelName.trim()) return
+  try {
+    const color = LABEL_COLORS[projectLabels.length % LABEL_COLORS.length]
+    const label = await createLabel({ projectId: task.project_id, name: newLabelName, color })
+    setNewLabelName('')
+    setProjectLabels((prev) => [...prev, label])
+    await addLabelToTask({ taskId: task.id, labelId: label.id })
+    await loadLabels()
+  } catch (err) {
+    setError(err.message)
+  }
+}
 
   async function handleAddComment(e) {
   e.preventDefault()
@@ -88,6 +161,9 @@ export default function TaskDetailPanel({ task, members, orgPlan, onClose, onTas
       body: newComment,
       projectId: task.project_id,
       taskTitle: task.title,
+      taskAssigneeId: task.assignee_id,
+      taskCreatedBy: task.created_by,
+      members,
     })
     setNewComment('')
   } catch (err) {
@@ -222,6 +298,76 @@ export default function TaskDetailPanel({ task, members, orgPlan, onClose, onTas
             ))}
           </select>
         </div>
+        <div className="mb-4">
+  <label className="font-mono text-[10px] font-semibold text-slate-muted uppercase tracking-wider mb-1.5 block">
+    Priority {savingPriority && <span className="text-violet">· saving</span>}
+  </label>
+  <select
+    value={priority}
+    onChange={handlePriorityChange}
+    className="w-full text-sm rounded-lg border border-black/10 px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-violet/40 bg-white"
+  >
+    <option value="low">Low</option>
+    <option value="medium">Medium</option>
+    <option value="high">High</option>
+    <option value="urgent">Urgent</option>
+  </select>
+</div>
+
+<div className="mb-4">
+  <label className="font-mono text-[10px] font-semibold text-slate-muted uppercase tracking-wider mb-1.5 block">
+    Labels
+  </label>
+  <div className="flex flex-wrap gap-1.5 mb-2">
+    {taskLabelList.map((label) => (
+      <button
+        key={label.id}
+        onClick={() => handleToggleLabel(label)}
+        className="text-xs px-2 py-1 rounded-full flex items-center gap-1"
+        style={{ backgroundColor: `${label.color}1A`, color: label.color }}
+      >
+        {label.name} ✕
+      </button>
+    ))}
+    <button
+      onClick={() => setShowLabelPicker(!showLabelPicker)}
+      className="text-xs px-2 py-1 rounded-full border border-black/10 text-slate-muted hover:text-ink"
+    >
+      + Add label
+    </button>
+  </div>
+
+  {showLabelPicker && (
+    <div className="bg-paper-dim rounded-lg p-2">
+      <div className="flex flex-wrap gap-1.5 mb-2">
+        {projectLabels
+          .filter((l) => !taskLabelList.some((tl) => tl.id === l.id))
+          .map((label) => (
+            <button
+              key={label.id}
+              onClick={() => handleToggleLabel(label)}
+              className="text-xs px-2 py-1 rounded-full"
+              style={{ backgroundColor: `${label.color}1A`, color: label.color }}
+            >
+              {label.name}
+            </button>
+          ))}
+      </div>
+      <form onSubmit={handleCreateLabel} className="flex gap-1">
+        <input
+          type="text"
+          value={newLabelName}
+          onChange={(e) => setNewLabelName(e.target.value)}
+          placeholder="New label name"
+          className="flex-1 text-xs rounded-md border border-black/10 px-2 py-1 bg-white"
+        />
+        <button type="submit" className="text-xs bg-violet text-white rounded-md px-2 hover:bg-violet/90">
+          Create
+        </button>
+      </form>
+    </div>
+  )}
+</div>
         <div className="mb-4">
             <label className="font-mono text-[10px] font-semibold text-slate-muted uppercase tracking-wider mb-1.5 block">
                 Due date {savingDueDate && <span className="text-violet">· saving</span>}
