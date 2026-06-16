@@ -8,6 +8,7 @@ import ProjectBoard from './pages/ProjectBoard'
 import ProjectChat from './pages/ProjectChat'
 import Billing from './pages/Billing'
 import LandingPage from './pages/LandingPage'
+import ProjectActivity from './pages/ProjectActivity'
 
 function PrivateRoute({ children }) {
   const { user, loading } = useAuth()
@@ -41,6 +42,7 @@ function App() {
         >
           <Route index element={<ProjectBoard />} />
           <Route path="chat" element={<ProjectChat />} />
+          <Route path="activity" element={<ProjectActivity />} />
         </Route>
         <Route path="/billing" element={
           <PrivateRoute>

@@ -13,6 +13,8 @@ import {
 } from '../lib/data'
 import { supabase } from '../lib/supabase'
 import { updateTaskDueDate } from '../lib/data'
+import { getTaskActivity } from '../lib/data'
+import { formatActivity } from '../lib/activityFormat'
 
 export default function TaskDetailPanel({ task, members, orgPlan, onClose, onTaskUpdated }) {
   const { user } = useAuth()
@@ -25,11 +27,13 @@ export default function TaskDetailPanel({ task, members, orgPlan, onClose, onTas
   const [uploading, setUploading] = useState(false)
   const [dueDate, setDueDate] = useState(task.due_date || '')
   const [savingDueDate, setSavingDueDate] = useState(false)
+  const [taskActivity, setTaskActivity] = useState([])
 
 
   useEffect(() => {
     loadComments()
     loadFiles()
+    loadTaskActivity()
 
     const channel = supabase
       .channel(`task-comments-${task.id}`)
@@ -65,16 +69,31 @@ export default function TaskDetailPanel({ task, members, orgPlan, onClose, onTas
     }
   }
 
-  async function handleAddComment(e) {
-    e.preventDefault()
-    if (!newComment.trim()) return
-    try {
-      await addTaskComment({ taskId: task.id, userId: user.id, body: newComment })
-      setNewComment('')
-    } catch (err) {
-      setError(err.message)
-    }
+  async function loadTaskActivity() {
+  try {
+    const data = await getTaskActivity(task.project_id, task.id)
+    setTaskActivity(data)
+  } catch (err) {
+    setError(err.message)
   }
+}
+
+  async function handleAddComment(e) {
+  e.preventDefault()
+  if (!newComment.trim()) return
+  try {
+    await addTaskComment({
+      taskId: task.id,
+      userId: user.id,
+      body: newComment,
+      projectId: task.project_id,
+      taskTitle: task.title,
+    })
+    setNewComment('')
+  } catch (err) {
+    setError(err.message)
+  }
+}
 
   async function handleFileUpload(e) {
     const file = e.target.files[0]
@@ -315,6 +334,20 @@ export default function TaskDetailPanel({ task, members, orgPlan, onClose, onTas
             </button>
           </form>
         </div>
+        {taskActivity.length > 0 && (
+        <div className="mt-6 pt-4 border-t border-black/5">
+            <label className="font-mono text-[10px] font-semibold text-slate-muted uppercase tracking-wider mb-2 block">
+                History
+            </label>
+            <div className="space-y-2">
+                {taskActivity.map((entry) => (
+                    <p key={entry.id} className="text-xs text-slate-muted">
+                        {formatActivity(entry)} · {new Date(entry.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    </p>
+                ))}
+            </div>
+        </div>
+        )}
       </motion.div>
     </motion.div>
   )

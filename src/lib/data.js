@@ -37,6 +37,13 @@ export async function createProject({ orgId, name, description, userId }) {
 
   if (memberError) throw memberError
 
+  await logActivity({
+    projectId: project.id,
+    actorId: userId,
+    action: 'project_created',
+    metadata: { name },
+  })
+
   return project
 }
 
@@ -124,21 +131,35 @@ export async function getTaskComments(taskId) {
   return data
 }
 
-export async function addTaskComment({ taskId, userId, body }) {
+export async function addTaskComment({ taskId, userId, body, projectId, taskTitle }) {
   const { error } = await supabase
     .from('task_comments')
     .insert({ task_id: taskId, user_id: userId, body })
 
   if (error) throw error
+
+  await logActivity({
+    projectId,
+    actorId: userId,
+    action: 'comment_added',
+    metadata: { task_id: taskId, title: taskTitle },
+  })
 }
 
-export async function updateTaskAssignee({ taskId, assigneeId }) {
+export async function updateTaskAssignee({ taskId, assigneeId, projectId, actorId, taskTitle, assigneeName }) {
   const { error } = await supabase
     .from('tasks')
     .update({ assignee_id: assigneeId, updated_at: new Date().toISOString() })
     .eq('id', taskId)
 
   if (error) throw error
+
+  await logActivity({
+    projectId,
+    actorId,
+    action: assigneeId ? 'task_assigned' : 'task_unassigned',
+    metadata: { task_id: taskId, title: taskTitle, assignee: assigneeName || null },
+  })
 }
 
 export async function updateTaskDescription({ taskId, description }) {
