@@ -134,3 +134,21 @@ export async function updateTaskDescription({ taskId, description }) {
 
   if (error) throw error
 }
+export async function getMessages(projectId) {
+  const { data, error } = await supabase
+    .from('messages')
+    .select('*, profiles(full_name)')
+    .eq('project_id', projectId)
+    .order('created_at', { ascending: true })
+
+  if (error) throw error
+  return data
+}
+
+export async function sendMessage({ projectId, userId, body }) {
+  const { error } = await supabase
+    .from('messages')
+    .insert({ project_id: projectId, user_id: userId, body })
+
+  if (error) throw error
+}

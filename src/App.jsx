@@ -3,7 +3,9 @@ import { useAuth } from './lib/AuthContext'
 import SignUp from './pages/SignUp'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
+import ProjectLayout from './pages/ProjectLayout'
 import ProjectBoard from './pages/ProjectBoard'
+import ProjectChat from './pages/ProjectChat'
 
 function PrivateRoute({ children }) {
   const { user, loading } = useAuth()
@@ -27,13 +29,16 @@ function App() {
           }
         />
         <Route
-        path="/projects/:projectId"
-        element={
-        <PrivateRoute>
-          <ProjectBoard />
-        </PrivateRoute>
-        }
-        />
+          path="/projects/:projectId"
+          element={
+            <PrivateRoute>
+              <ProjectLayout />
+            </PrivateRoute>
+          }
+        >
+          <Route index element={<ProjectBoard />} />
+          <Route path="chat" element={<ProjectChat />} />
+        </Route>
         <Route path="/" element={<Navigate to="/signup" />} />
       </Routes>
     </BrowserRouter>
