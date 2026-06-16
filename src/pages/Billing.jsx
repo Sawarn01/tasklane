@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { motion } from 'framer-motion'
 import { DodoPayments } from 'dodopayments-checkout'
 import { useAuth } from '../lib/AuthContext'
-import { getMyOrg } from '../lib/data'
-import { createCheckoutSession } from '../lib/data'
+import { getMyOrg, createCheckoutSession } from '../lib/data'
 
 const PLANS = [
   { key: 'free', name: 'Free', price: '$0', features: ['1 project', '3 team members'] },
@@ -26,7 +26,6 @@ export default function Billing() {
       onEvent: (event) => {
         console.log('Checkout event:', event)
         if (event.event_type === 'checkout.closed') {
-          // refresh org data in case the payment went through
           loadOrg()
         }
       },
@@ -64,48 +63,85 @@ export default function Billing() {
     }
   }
 
-  if (loading) return <div className="p-8 text-slate-500">Loading...</div>
+  if (loading) {
+    return <div className="p-8 text-slate-muted font-mono text-xs uppercase tracking-wider">Loading...</div>
+  }
 
   return (
-    <div className="min-h-screen bg-slate-50 p-8">
-      <button onClick={() => navigate('/dashboard')} className="text-sm text-slate-500 mb-6">
+    <div className="min-h-screen bg-paper p-8">
+      <button onClick={() => navigate('/dashboard')} className="text-sm text-slate-muted hover:text-ink mb-6 transition-colors">
         ← Back to dashboard
       </button>
 
-      <h1 className="text-2xl font-bold text-slate-900 mb-2">Billing</h1>
-      <p className="text-slate-500 mb-8">
-        Current plan: <span className="font-semibold capitalize">{org?.plan}</span>
-      </p>
+      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
+        <p className="font-mono text-xs uppercase tracking-wider text-violet mb-2">Billing</p>
+        <h1 className="text-2xl font-semibold text-ink mb-2">Choose your plan</h1>
+        <p className="text-slate-muted mb-8">
+          Current plan: <span className="font-semibold text-ink capitalize">{org?.plan}</span>
+        </p>
+      </motion.div>
 
       {error && (
-        <div className="mb-6 text-sm text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2 max-w-md">
+        <motion.div
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-6 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2 max-w-md"
+        >
           {error}
-        </div>
+        </motion.div>
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-3xl">
-        {PLANS.map((plan) => (
-          <div key={plan.key} className="bg-white border border-slate-200 rounded-xl p-6">
-            <h3 className="font-semibold text-slate-900">{plan.name}</h3>
-            <p className="text-2xl font-bold text-slate-900 my-2">{plan.price}</p>
-            <ul className="text-sm text-slate-600 space-y-1 mb-4">
-              {plan.features.map((f) => (
-                <li key={f}>• {f}</li>
-              ))}
-            </ul>
-            {org?.plan === plan.key ? (
-              <div className="text-sm text-center text-slate-400 py-2">Current plan</div>
-            ) : plan.key === 'free' ? null : (
-              <button
-                onClick={() => handleUpgrade(plan.key)}
-                disabled={upgrading === plan.key}
-                className="w-full bg-indigo-600 text-white rounded-md py-2 text-sm font-medium hover:bg-indigo-700 disabled:opacity-50"
-              >
-                {upgrading === plan.key ? 'Loading...' : `Upgrade to ${plan.name}`}
-              </button>
-            )}
-          </div>
-        ))}
+        {PLANS.map((plan, i) => {
+          const isCurrent = org?.plan === plan.key
+          const isPro = plan.key === 'pro'
+          return (
+            <motion.div
+              key={plan.key}
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.35, delay: i * 0.08 }}
+              whileHover={{ y: -2 }}
+              className={`bg-white rounded-2xl p-6 relative ${
+                isPro ? 'border-2 border-violet' : 'border border-black/10'
+              }`}
+            >
+              {isPro && (
+                <span className="absolute -top-3 left-6 bg-violet text-white text-[10px] font-mono uppercase tracking-wide px-2 py-1 rounded-full">
+                  Most teams
+                </span>
+              )}
+              <h3 className="font-semibold text-ink">{plan.name}</h3>
+              <p className="text-2xl font-semibold text-ink my-2">{plan.price}</p>
+              <ul className="text-sm text-slate-muted space-y-1.5 mb-5">
+                {plan.features.map((f) => (
+                  <li key={f} className="flex items-center gap-2">
+                    <span className="w-1 h-1 rounded-full bg-sage" />
+                    {f}
+                  </li>
+                ))}
+              </ul>
+              {isCurrent ? (
+                <div className="text-sm text-center text-slate-muted py-2 font-mono uppercase tracking-wide text-[11px]">
+                  Current plan
+                </div>
+              ) : plan.key === 'free' ? null : (
+                <motion.button
+                  whileTap={{ scale: 0.97 }}
+                  onClick={() => handleUpgrade(plan.key)}
+                  disabled={upgrading === plan.key}
+                  className={`w-full rounded-full py-2.5 text-sm font-medium transition-colors disabled:opacity-50 ${
+                    isPro
+                      ? 'bg-violet text-white hover:bg-violet/90'
+                      : 'border border-black/10 text-ink hover:bg-paper-dim'
+                  }`}
+                >
+                  {upgrading === plan.key ? 'Loading...' : `Upgrade to ${plan.name}`}
+                </motion.button>
+              )}
+            </motion.div>
+          )
+        })}
       </div>
     </div>
   )
