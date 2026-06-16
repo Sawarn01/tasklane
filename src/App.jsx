@@ -7,6 +7,7 @@ import ProjectLayout from './pages/ProjectLayout'
 import ProjectBoard from './pages/ProjectBoard'
 import ProjectChat from './pages/ProjectChat'
 import Billing from './pages/Billing'
+import LandingPage from './pages/LandingPage'
 
 function PrivateRoute({ children }) {
   const { user, loading } = useAuth()
@@ -21,6 +22,7 @@ function App() {
       <Routes>
         <Route path="/signup" element={<SignUp />} />
         <Route path="/login" element={<Login />} />
+        <Route path="/" element={<LandingPage />} />
         <Route
           path="/dashboard"
           element={
@@ -45,7 +47,7 @@ function App() {
             <Billing />
           </PrivateRoute>
         } />
-        <Route path="/" element={<Navigate to="/signup" />} />
+        
       </Routes>
     </BrowserRouter>
     

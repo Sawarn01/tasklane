@@ -1,1 +1,19 @@
 @import "tailwindcss";
+
+@theme {
+  --color-ink: #0F1115;
+  --color-paper: #FAFAF7;
+  --color-paper-dim: #F1EFE7;
+  --color-violet: #6E56CF;
+  --color-violet-dim: #6E56CF1A;
+  --color-sage: #36D399;
+  --color-slate-muted: #8A8F98;
+
+  --font-display: "Inter", sans-serif;
+  --font-mono-label: "JetBrains Mono", monospace;
+}
+
+body {
+  background-color: var(--color-paper);
+  color: var(--color-ink);
+}

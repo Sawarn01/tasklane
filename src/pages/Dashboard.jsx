@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '../lib/AuthContext'
 import { getMyOrg, getMyProjects, createProject } from '../lib/data'
 import { signOut } from '../lib/auth'
@@ -58,91 +59,138 @@ export default function Dashboard() {
   }
 
   if (loading) {
-    return <div className="min-h-screen flex items-center justify-center text-slate-500">Loading...</div>
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-paper">
+        <motion.div
+          animate={{ opacity: [0.4, 1, 0.4] }}
+          transition={{ duration: 1.2, repeat: Infinity, ease: 'easeInOut' }}
+          className="font-mono text-xs uppercase tracking-wider text-slate-muted"
+        >
+          Loading workspace...
+        </motion.div>
+      </div>
+    )
   }
 
   return (
-    <div className="min-h-screen flex bg-slate-50">
+    <div className="min-h-screen flex bg-paper">
       {/* Sidebar */}
-      <aside className="w-64 bg-white border-r border-slate-200 flex flex-col">
-        <div className="p-4 border-b border-slate-200">
-          <p className="font-semibold text-slate-900 truncate">{org?.name}</p>
-          <p className="text-xs text-slate-500 capitalize">{org?.plan} plan · {role}</p>
+      <motion.aside
+        initial={{ x: -16, opacity: 0 }}
+        animate={{ x: 0, opacity: 1 }}
+        transition={{ duration: 0.4, ease: 'easeOut' }}
+        className="w-64 bg-white border-r border-black/5 flex flex-col"
+      >
+        <div className="p-4 border-b border-black/5">
+          <p className="font-semibold text-ink truncate">{org?.name}</p>
+          <div className="flex items-center gap-2 mt-1">
+            <span className="font-mono text-[10px] uppercase tracking-wider text-violet bg-violet-dim rounded px-1.5 py-0.5">
+              {org?.plan}
+            </span>
+            <span className="text-xs text-slate-muted">{role}</span>
+          </div>
           <button
             onClick={() => navigate('/billing')}
-            className="text-xs text-indigo-600 hover:text-indigo-700 mt-1"
-        >
-  Manage billing →
-</button>
+            className="text-xs text-violet hover:opacity-70 mt-2 transition-opacity"
+          >
+            Manage billing →
+          </button>
         </div>
 
         <div className="flex-1 overflow-y-auto p-3">
           <div className="flex items-center justify-between mb-2 px-1">
-            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Projects</p>
+            <p className="font-mono text-[10px] font-semibold text-slate-muted uppercase tracking-wider">
+              Projects
+            </p>
             <button
               onClick={() => setShowNewProject(!showNewProject)}
-              className="text-indigo-600 text-sm font-medium hover:text-indigo-700"
+              className="text-violet text-sm font-medium hover:opacity-70 transition-opacity"
             >
               + New
             </button>
           </div>
 
-          {showNewProject && (
-            <form onSubmit={handleCreateProject} className="mb-3 px-1">
-              <input
-                type="text"
-                required
-                autoFocus
-                value={newProjectName}
-                onChange={(e) => setNewProjectName(e.target.value)}
-                placeholder="Project name"
-                className="w-full text-sm rounded-md border border-slate-300 px-2 py-1.5 mb-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              />
-              <button
-                type="submit"
-                disabled={creating}
-                className="w-full text-sm bg-indigo-600 text-white rounded-md py-1.5 hover:bg-indigo-700 disabled:opacity-50"
+          <AnimatePresence>
+            {showNewProject && (
+              <motion.form
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                onSubmit={handleCreateProject}
+                className="mb-3 px-1 overflow-hidden"
               >
-                {creating ? 'Creating...' : 'Create'}
-              </button>
-            </form>
-          )}
+                <input
+                  type="text"
+                  required
+                  autoFocus
+                  value={newProjectName}
+                  onChange={(e) => setNewProjectName(e.target.value)}
+                  placeholder="Project name"
+                  className="w-full text-sm rounded-lg border border-black/10 px-2 py-1.5 mb-2 focus:outline-none focus:ring-2 focus:ring-violet/40"
+                />
+                <button
+                  type="submit"
+                  disabled={creating}
+                  className="w-full text-sm bg-violet text-white rounded-lg py-1.5 hover:bg-violet/90 disabled:opacity-50 transition-colors"
+                >
+                  {creating ? 'Creating...' : 'Create'}
+                </button>
+              </motion.form>
+            )}
+          </AnimatePresence>
 
           <nav className="space-y-1">
-            {projects.map((project) => (
-              <button
-                key={project.id}
-                onClick={() => navigate(`/projects/${project.id}`)}
-                className="w-full text-left text-sm text-slate-700 hover:bg-slate-100 rounded-md px-2 py-1.5 truncate"
-              >
-                {project.name}
-              </button>
-            ))}
+            <AnimatePresence>
+              {projects.map((project, i) => (
+                <motion.button
+                  key={project.id}
+                  initial={{ opacity: 0, x: -8 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.25, delay: i * 0.04 }}
+                  whileHover={{ x: 2 }}
+                  onClick={() => navigate(`/projects/${project.id}`)}
+                  className="w-full text-left text-sm text-ink hover:bg-paper-dim rounded-lg px-2 py-1.5 truncate block"
+                >
+                  {project.name}
+                </motion.button>
+              ))}
+            </AnimatePresence>
             {projects.length === 0 && (
-              <p className="text-sm text-slate-400 px-2">No projects yet</p>
+              <p className="text-sm text-slate-muted px-2">No projects yet</p>
             )}
           </nav>
         </div>
 
-        <div className="p-3 border-t border-slate-200">
+        <div className="p-3 border-t border-black/5">
           <button
             onClick={handleLogout}
-            className="w-full text-sm text-slate-600 hover:text-slate-900 text-left px-2 py-1.5"
+            className="w-full text-sm text-slate-muted hover:text-ink text-left px-2 py-1.5 transition-colors"
           >
             Log out
           </button>
         </div>
-      </aside>
+      </motion.aside>
 
       {/* Main content */}
       <main className="flex-1 p-8">
         {error && (
-          <div className="mb-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2">
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2"
+          >
             {error}
-          </div>
+          </motion.div>
         )}
-        <h1 className="text-xl font-semibold text-slate-900 mb-2">Welcome back</h1>
-        <p className="text-slate-500">Select a project from the sidebar, or create a new one to get started.</p>
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.1 }}
+        >
+          <h1 className="text-xl font-semibold text-ink mb-2">Welcome back</h1>
+          <p className="text-slate-muted">Select a project from the sidebar, or create a new one to get started.</p>
+        </motion.div>
       </main>
     </div>
   )
