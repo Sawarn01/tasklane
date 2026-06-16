@@ -39,6 +39,8 @@ function TaskCard({ task, onClick }) {
     opacity: isDragging ? 0.4 : 1,
   }
 
+  const isOverdue = task.due_date && task.status !== 'done' && new Date(task.due_date) < new Date(new Date().toDateString())
+
   return (
     <motion.div
       ref={setNodeRef}
@@ -53,6 +55,12 @@ function TaskCard({ task, onClick }) {
       }`}
     >
       <p className="text-sm font-medium text-ink">{task.title}</p>
+      {task.due_date && (
+        <p className={`font-mono text-[10px] uppercase tracking-wide mt-1.5 ${isOverdue ? 'text-red-600' : 'text-slate-muted'}`}>
+          {isOverdue ? 'Overdue · ' : 'Due '}
+          {new Date(task.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+        </p>
+      )}
     </motion.div>
   )
 }

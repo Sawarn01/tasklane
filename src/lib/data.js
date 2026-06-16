@@ -224,3 +224,12 @@ export async function deleteFile({ fileId, storagePath }) {
   const { error: dbError } = await supabase.from('files').delete().eq('id', fileId)
   if (dbError) throw dbError
 }
+
+export async function updateTaskDueDate({ taskId, dueDate }) {
+  const { error } = await supabase
+    .from('tasks')
+    .update({ due_date: dueDate, updated_at: new Date().toISOString() })
+    .eq('id', taskId)
+
+  if (error) throw error
+}

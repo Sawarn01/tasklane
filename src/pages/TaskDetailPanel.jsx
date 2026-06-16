@@ -12,6 +12,7 @@ import {
   deleteFile,
 } from '../lib/data'
 import { supabase } from '../lib/supabase'
+import { updateTaskDueDate } from '../lib/data'
 
 export default function TaskDetailPanel({ task, members, orgPlan, onClose, onTaskUpdated }) {
   const { user } = useAuth()
@@ -22,6 +23,9 @@ export default function TaskDetailPanel({ task, members, orgPlan, onClose, onTas
   const [error, setError] = useState('')
   const [files, setFiles] = useState([])
   const [uploading, setUploading] = useState(false)
+  const [dueDate, setDueDate] = useState(task.due_date || '')
+  const [savingDueDate, setSavingDueDate] = useState(false)
+
 
   useEffect(() => {
     loadComments()
@@ -127,6 +131,20 @@ export default function TaskDetailPanel({ task, members, orgPlan, onClose, onTas
     }
   }
 
+  async function handleDueDateChange(e) {
+  const value = e.target.value
+  setDueDate(value)
+  setSavingDueDate(true)
+  try {
+    await updateTaskDueDate({ taskId: task.id, dueDate: value || null })
+    onTaskUpdated()
+  } catch (err) {
+    setError(err.message)
+  } finally {
+    setSavingDueDate(false)
+  }
+}
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -176,6 +194,17 @@ export default function TaskDetailPanel({ task, members, orgPlan, onClose, onTas
               <option key={m.id} value={m.id}>{m.full_name || m.id}</option>
             ))}
           </select>
+        </div>
+        <div className="mb-4">
+            <label className="font-mono text-[10px] font-semibold text-slate-muted uppercase tracking-wider mb-1.5 block">
+                Due date {savingDueDate && <span className="text-violet">· saving</span>}
+            </label>
+            <input
+            type="date"
+            value={dueDate}
+            onChange={handleDueDateChange}
+            className="w-full text-sm rounded-lg border border-black/10 px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-violet/40 bg-white"
+            />
         </div>
 
         <div className="mb-6">
