@@ -169,3 +169,58 @@ export async function createCheckoutSession({ plan, orgId, userEmail, userName }
   if (!response.ok) throw new Error(data.error || 'Failed to create checkout session')
   return data
 }
+
+export async function uploadFile({ projectId, taskId, file, userId }) {
+  const fileId = crypto.randomUUID()
+  const path = `${projectId}/${fileId}-${file.name}`
+
+  const { error: uploadError } = await supabase.storage
+    .from('task-files')
+    .upload(path, file)
+
+  if (uploadError) throw uploadError
+
+  const { error: dbError } = await supabase
+    .from('files')
+    .insert({
+      task_id: taskId,
+      project_id: projectId,
+      uploaded_by: userId,
+      storage_path: path,
+      file_name: file.name,
+      file_size: file.size,
+    })
+
+  if (dbError) throw dbError
+}
+
+export async function getTaskFiles(taskId) {
+  const { data, error } = await supabase
+    .from('files')
+    .select('*')
+    .eq('task_id', taskId)
+    .order('created_at', { ascending: false })
+
+  if (error) throw error
+  return data
+}
+
+export async function getFileDownloadUrl(storagePath) {
+  const { data, error } = await supabase.storage
+    .from('task-files')
+    .createSignedUrl(storagePath, 60) // valid for 60 seconds
+
+  if (error) throw error
+  return data.signedUrl
+}
+
+export async function deleteFile({ fileId, storagePath }) {
+  const { error: storageError } = await supabase.storage
+    .from('task-files')
+    .remove([storagePath])
+
+  if (storageError) throw storageError
+
+  const { error: dbError } = await supabase.from('files').delete().eq('id', fileId)
+  if (dbError) throw dbError
+}

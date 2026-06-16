@@ -7,33 +7,37 @@ import {
   updateTaskDescription,
 } from '../lib/data'
 import { supabase } from '../lib/supabase'
+import { getTaskFiles, uploadFile, getFileDownloadUrl, deleteFile } from '../lib/data'
 
-export default function TaskDetailPanel({ task, members, onClose, onTaskUpdated }) {
+export default function TaskDetailPanel({ task, members, orgPlan, onClose, onTaskUpdated }) {
   const { user } = useAuth()
   const [comments, setComments] = useState([])
   const [newComment, setNewComment] = useState('')
   const [description, setDescription] = useState(task.description || '')
   const [savingDescription, setSavingDescription] = useState(false)
   const [error, setError] = useState('')
+  const [files, setFiles] = useState([])
+  const [uploading, setUploading] = useState(false)
 
   useEffect(() => {
-    loadComments()
+  loadComments()
+  loadFiles()
 
-    const channel = supabase
-      .channel(`task-comments-${task.id}`)
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'task_comments', filter: `task_id=eq.${task.id}` },
-        () => {
-          loadComments()
-        }
-      )
-      .subscribe()
+  const channel = supabase
+    .channel(`task-comments-${task.id}`)
+    .on(
+      'postgres_changes',
+      { event: 'INSERT', schema: 'public', table: 'task_comments', filter: `task_id=eq.${task.id}` },
+      () => {
+        loadComments()
+      }
+    )
+    .subscribe()
 
-    return () => {
-      supabase.removeChannel(channel)
-    }
-  }, [task.id])
+  return () => {
+    supabase.removeChannel(channel)
+  }
+}, [task.id])
 
   async function loadComments() {
     try {
@@ -43,6 +47,14 @@ export default function TaskDetailPanel({ task, members, onClose, onTaskUpdated 
       setError(err.message)
     }
   }
+  async function loadFiles() {
+  try {
+    const data = await getTaskFiles(task.id)
+    setFiles(data)
+  } catch (err) {
+    setError(err.message)
+  }
+}
 
   async function handleAddComment(e) {
     e.preventDefault()
@@ -54,6 +66,38 @@ export default function TaskDetailPanel({ task, members, onClose, onTaskUpdated 
       setError(err.message)
     }
   }
+
+  async function handleFileUpload(e) {
+  const file = e.target.files[0]
+  if (!file) return
+  setUploading(true)
+  try {
+    await uploadFile({ projectId: task.project_id, taskId: task.id, file, userId: user.id })
+    await loadFiles()
+  } catch (err) {
+    setError(err.message)
+  } finally {
+    setUploading(false)
+  }
+}
+
+async function handleDownload(file) {
+  try {
+    const url = await getFileDownloadUrl(file.storage_path)
+    window.open(url, '_blank')
+  } catch (err) {
+    setError(err.message)
+  }
+}
+
+async function handleDeleteFile(file) {
+  try {
+    await deleteFile({ fileId: file.id, storagePath: file.storage_path })
+    await loadFiles()
+  } catch (err) {
+    setError(err.message)
+  }
+}
 
   async function handleAssigneeChange(e) {
     const assigneeId = e.target.value || null
@@ -122,6 +166,38 @@ export default function TaskDetailPanel({ task, members, onClose, onTaskUpdated 
             className="w-full text-sm rounded-md border border-slate-300 px-2 py-1.5 resize-none"
           />
         </div>
+        <div className="mb-6">
+  <label className="block text-xs font-semibold text-slate-500 uppercase mb-2">Files</label>
+
+  {orgPlan === 'company' ? (
+    <>
+      <input
+        type="file"
+        onChange={handleFileUpload}
+        disabled={uploading}
+        className="text-sm mb-3"
+      />
+      {uploading && <p className="text-sm text-slate-400">Uploading...</p>}
+    </>
+  ) : (
+    <p className="text-sm text-slate-400 mb-3">
+      File uploads are available on the Company plan.
+    </p>
+  )}
+
+  <div className="space-y-2">
+    {files.map((f) => (
+      <div key={f.id} className="flex items-center justify-between text-sm bg-slate-50 rounded-md px-3 py-2">
+        <button onClick={() => handleDownload(f)} className="text-indigo-600 hover:underline truncate">
+          {f.file_name}
+        </button>
+        <button onClick={() => handleDeleteFile(f)} className="text-slate-400 hover:text-red-600 ml-2">
+          ✕
+        </button>
+      </div>
+    ))}
+  </div>
+</div>
 
         <div>
           <label className="block text-xs font-semibold text-slate-500 uppercase mb-2">

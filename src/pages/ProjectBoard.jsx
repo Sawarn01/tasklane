@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import TaskDetailPanel from './TaskDetailPanel'
+import { getMyOrg } from '../lib/data'
+
 import {
   DndContext,
   closestCorners,
@@ -27,6 +29,7 @@ const COLUMNS = [
   { key: 'review', label: 'Review' },
   { key: 'done', label: 'Done' },
 ]
+
 
 function TaskCard({ task, onClick }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -85,12 +88,14 @@ export default function ProjectBoard() {
   const [addingTo, setAddingTo] = useState(null)
   const [members, setMembers] = useState([])
   const [selectedTask, setSelectedTask] = useState(null)
+  const [orgPlan, setOrgPlan] = useState(null)
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
 
   useEffect(() => {
   loadTasks()
   getProjectMembers(projectId).then(setMembers).catch((err) => setError(err.message))
+  getMyOrg().then(({ org }) => setOrgPlan(org.plan)).catch((err) => setError(err.message))
 
   const channel = supabase
     .channel(`tasks-${projectId}`)
@@ -224,11 +229,13 @@ export default function ProjectBoard() {
       </DndContext>
       {selectedTask && (
         <TaskDetailPanel
-        task={selectedTask}
-        members={members}
-        onClose={() => setSelectedTask(null)}
-        onTaskUpdated={loadTasks}
+            task={selectedTask}
+            members={members}
+            orgPlan={orgPlan}
+            onClose={() => setSelectedTask(null)}
+            onTaskUpdated={loadTasks}
         />
+
 )}
     </div>
   )
