@@ -62,7 +62,6 @@ export async function getTasks(projectId) {
 }
 
 export async function createTask({ projectId, title, userId, status = 'todo' }) {
-  // find the max position in this status column, put new task at the end
   const { data: existing } = await supabase
     .from('tasks')
     .select('position')
@@ -80,16 +79,33 @@ export async function createTask({ projectId, title, userId, status = 'todo' }) 
     .single()
 
   if (error) throw error
+
+  await logActivity({
+    projectId,
+    actorId: userId,
+    action: 'task_created',
+    metadata: { task_id: data.id, title },
+  })
+
   return data
 }
 
-export async function updateTaskPosition({ taskId, status, position }) {
+export async function updateTaskPosition({ taskId, status, position, userId, previousStatus, taskTitle, projectId }) {
   const { error } = await supabase
     .from('tasks')
     .update({ status, position, updated_at: new Date().toISOString() })
     .eq('id', taskId)
 
   if (error) throw error
+
+  if (previousStatus && previousStatus !== status) {
+    await logActivity({
+      projectId,
+      actorId: userId,
+      action: 'task_moved',
+      metadata: { task_id: taskId, title: taskTitle, from: previousStatus, to: status },
+    })
+  }
 }
 
 export async function deleteTask(taskId) {
@@ -232,4 +248,37 @@ export async function updateTaskDueDate({ taskId, dueDate }) {
     .eq('id', taskId)
 
   if (error) throw error
+}
+
+export async function logActivity({ projectId, actorId, action, metadata = {} }) {
+  const { error } = await supabase
+    .from('activity_log')
+    .insert({ project_id: projectId, actor_id: actorId, action, metadata })
+
+  if (error) console.error('Failed to log activity:', error)
+  // deliberately not throwing — activity logging should never block the actual user action
+}
+
+export async function getProjectActivity(projectId) {
+  const { data, error } = await supabase
+    .from('activity_log')
+    .select('*, profiles(full_name)')
+    .eq('project_id', projectId)
+    .order('created_at', { ascending: false })
+    .limit(100)
+
+  if (error) throw error
+  return data
+}
+
+export async function getTaskActivity(projectId, taskId) {
+  const { data, error } = await supabase
+    .from('activity_log')
+    .select('*, profiles(full_name)')
+    .eq('project_id', projectId)
+    .eq('metadata->>task_id', taskId)
+    .order('created_at', { ascending: false })
+
+  if (error) throw error
+  return data
 }

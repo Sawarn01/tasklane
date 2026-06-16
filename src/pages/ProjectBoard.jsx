@@ -183,7 +183,15 @@ export default function ProjectBoard() {
     )
 
     try {
-      await updateTaskPosition({ taskId: activeTask.id, status: targetStatus, position: newPosition })
+      await updateTaskPosition({
+        taskId: activeTask.id,
+        status: targetStatus,
+        position: newPosition,
+        userId: user.id,
+        previousStatus: activeTask.status,
+        taskTitle: activeTask.title,
+        projectId,
+      })
     } catch (err) {
       setError(err.message)
       await loadTasks()

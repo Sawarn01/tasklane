@@ -109,14 +109,22 @@ export default function TaskDetailPanel({ task, members, orgPlan, onClose, onTas
   }
 
   async function handleAssigneeChange(e) {
-    const assigneeId = e.target.value || null
-    try {
-      await updateTaskAssignee({ taskId: task.id, assigneeId })
-      onTaskUpdated()
-    } catch (err) {
-      setError(err.message)
-    }
+  const assigneeId = e.target.value || null
+  const assigneeName = members.find((m) => m.id === assigneeId)?.full_name
+  try {
+    await updateTaskAssignee({
+      taskId: task.id,
+      assigneeId,
+      projectId: task.project_id,
+      actorId: user.id,
+      taskTitle: task.title,
+      assigneeName,
+    })
+    onTaskUpdated()
+  } catch (err) {
+    setError(err.message)
   }
+}
 
   async function handleDescriptionBlur() {
     if (description === task.description) return
