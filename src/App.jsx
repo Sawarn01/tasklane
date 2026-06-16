@@ -3,6 +3,7 @@ import { useAuth } from './lib/AuthContext'
 import SignUp from './pages/SignUp'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
+import ProjectBoard from './pages/ProjectBoard'
 
 function PrivateRoute({ children }) {
   const { user, loading } = useAuth()
@@ -24,6 +25,14 @@ function App() {
               <Dashboard />
             </PrivateRoute>
           }
+        />
+        <Route
+        path="/projects/:projectId"
+        element={
+        <PrivateRoute>
+          <ProjectBoard />
+        </PrivateRoute>
+        }
         />
         <Route path="/" element={<Navigate to="/signup" />} />
       </Routes>
