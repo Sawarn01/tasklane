@@ -97,3 +97,40 @@ export async function deleteTask(taskId) {
   const { error } = await supabase.from('tasks').delete().eq('id', taskId)
   if (error) throw error
 }
+
+export async function getTaskComments(taskId) {
+  const { data, error } = await supabase
+    .from('task_comments')
+    .select('*, profiles(full_name)')
+    .eq('task_id', taskId)
+    .order('created_at', { ascending: true })
+
+  if (error) throw error
+  return data
+}
+
+export async function addTaskComment({ taskId, userId, body }) {
+  const { error } = await supabase
+    .from('task_comments')
+    .insert({ task_id: taskId, user_id: userId, body })
+
+  if (error) throw error
+}
+
+export async function updateTaskAssignee({ taskId, assigneeId }) {
+  const { error } = await supabase
+    .from('tasks')
+    .update({ assignee_id: assigneeId, updated_at: new Date().toISOString() })
+    .eq('id', taskId)
+
+  if (error) throw error
+}
+
+export async function updateTaskDescription({ taskId, description }) {
+  const { error } = await supabase
+    .from('tasks')
+    .update({ description, updated_at: new Date().toISOString() })
+    .eq('id', taskId)
+
+  if (error) throw error
+}

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import TaskDetailPanel from './TaskDetailPanel'
 import {
   DndContext,
   closestCorners,
@@ -27,10 +28,12 @@ const COLUMNS = [
   { key: 'done', label: 'Done' },
 ]
 
-function TaskCard({ task }) {
+function TaskCard({ task, onClick }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: task.id,
   })
+
+
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -44,14 +47,16 @@ function TaskCard({ task }) {
       style={style}
       {...attributes}
       {...listeners}
+      onClick={() => onClick(task)}
       className="bg-white border border-slate-200 rounded-lg p-3 mb-2 shadow-sm cursor-grab active:cursor-grabbing"
     >
       <p className="text-sm font-medium text-slate-900">{task.title}</p>
     </div>
   )
+
 }
 
-function Column({ column, tasks }) {
+function Column({ column, tasks, onTaskClick }) {
   const { setNodeRef } = useDroppable({ id: column.key })
 
   return (
@@ -62,7 +67,7 @@ function Column({ column, tasks }) {
       <SortableContext items={tasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
         <div ref={setNodeRef} className="min-h-[200px]">
           {tasks.map((task) => (
-            <TaskCard key={task.id} task={task} />
+            <TaskCard key={task.id} task={task} onClick={onTaskClick} />
           ))}
         </div>
       </SortableContext>
@@ -78,24 +83,26 @@ export default function ProjectBoard() {
   const [error, setError] = useState('')
   const [newTaskTitle, setNewTaskTitle] = useState('')
   const [addingTo, setAddingTo] = useState(null)
+  const [members, setMembers] = useState([])
+  const [selectedTask, setSelectedTask] = useState(null)
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
 
   useEffect(() => {
-    loadTasks()
+  loadTasks()
+  getProjectMembers(projectId).then(setMembers).catch((err) => setError(err.message))
 
-    // realtime: refresh when any task in this project changes
-    const channel = supabase
-      .channel(`tasks-${projectId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks', filter: `project_id=eq.${projectId}` }, () => {
-        loadTasks()
-      })
-      .subscribe()
+  const channel = supabase
+    .channel(`tasks-${projectId}`)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks', filter: `project_id=eq.${projectId}` }, () => {
+      loadTasks()
+    })
+    .subscribe()
 
-    return () => {
-      supabase.removeChannel(channel)
-    }
-  }, [projectId])
+  return () => {
+    supabase.removeChannel(channel)
+  }
+}, [projectId])
 
   async function loadTasks() {
     try {
@@ -181,7 +188,7 @@ export default function ProjectBoard() {
 
             return (
               <div key={column.key}>
-                <Column column={column} tasks={columnTasks} />
+                <Column column={column} tasks={columnTasks} onTaskClick={setSelectedTask} />
                 <div className="w-72 mt-2">
                   {addingTo === column.key ? (
                     <div className="flex gap-1">
@@ -215,6 +222,14 @@ export default function ProjectBoard() {
           })}
         </div>
       </DndContext>
+      {selectedTask && (
+        <TaskDetailPanel
+        task={selectedTask}
+        members={members}
+        onClose={() => setSelectedTask(null)}
+        onTaskUpdated={loadTasks}
+        />
+)}
     </div>
   )
 }
