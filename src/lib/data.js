@@ -31,7 +31,6 @@ export async function createProject({ orgId, name, description, userId }) {
 
   if (projectError) throw projectError
 
-  // creator automatically becomes a project member
   const { error: memberError } = await supabase
     .from('project_members')
     .insert({ project_id: project.id, user_id: userId })
@@ -151,4 +150,22 @@ export async function sendMessage({ projectId, userId, body }) {
     .insert({ project_id: projectId, user_id: userId, body })
 
   if (error) throw error
+}
+
+export async function createCheckoutSession({ plan, orgId, userEmail, userName }) {
+  const response = await fetch(
+    `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-checkout-session`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+      },
+      body: JSON.stringify({ plan, orgId, userEmail, userName }),
+    }
+  )
+
+  const data = await response.json()
+  if (!response.ok) throw new Error(data.error || 'Failed to create checkout session')
+  return data
 }

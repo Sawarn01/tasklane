@@ -68,6 +68,12 @@ export default function Dashboard() {
         <div className="p-4 border-b border-slate-200">
           <p className="font-semibold text-slate-900 truncate">{org?.name}</p>
           <p className="text-xs text-slate-500 capitalize">{org?.plan} plan · {role}</p>
+          <button
+            onClick={() => navigate('/billing')}
+            className="text-xs text-indigo-600 hover:text-indigo-700 mt-1"
+        >
+  Manage billing →
+</button>
         </div>
 
         <div className="flex-1 overflow-y-auto p-3">
