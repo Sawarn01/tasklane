@@ -6,13 +6,29 @@ import Dashboard from './pages/Dashboard'
 import ProjectLayout from './pages/ProjectLayout'
 import ProjectBoard from './pages/ProjectBoard'
 import ProjectChat from './pages/ProjectChat'
+import Backlog from './pages/Backlog'
+import Timeline from './pages/Timeline'
+import Reports from './pages/Reports'
+import ProjectSettings from './pages/ProjectSettings'
+import Releases from './pages/Releases'
 import Billing from './pages/Billing'
 import LandingPage from './pages/LandingPage'
 import ProjectActivity from './pages/ProjectActivity'
+import UserProfile from './pages/UserProfile'
+import OrgSettings from './pages/OrgSettings'
 
 function PrivateRoute({ children }) {
   const { user, loading } = useAuth()
-  if (loading) return <div className="min-h-screen flex items-center justify-center">Loading...</div>
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center bg-paper">
+      <div className="flex flex-col items-center gap-3">
+        <div className="w-6 h-6 bg-ink rounded-lg flex items-center justify-center">
+          <div className="w-2.5 h-2.5 bg-violet rounded-sm" />
+        </div>
+        <p className="font-mono text-xs text-slate-muted uppercase tracking-wider animate-pulse">Loading…</p>
+      </div>
+    </div>
+  )
   if (!user) return <Navigate to="/login" />
   return children
 }
@@ -21,38 +37,30 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
+        <Route path="/" element={<LandingPage />} />
         <Route path="/signup" element={<SignUp />} />
         <Route path="/login" element={<Login />} />
-        <Route path="/" element={<LandingPage />} />
-        <Route
-          path="/dashboard"
-          element={
-            <PrivateRoute>
-              <Dashboard />
-            </PrivateRoute>
-          }
-        />
+
+        <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
+        <Route path="/billing" element={<PrivateRoute><Billing /></PrivateRoute>} />
+        <Route path="/profile" element={<PrivateRoute><UserProfile /></PrivateRoute>} />
+        <Route path="/org/settings" element={<PrivateRoute><OrgSettings /></PrivateRoute>} />
+
         <Route
           path="/projects/:projectId"
-          element={
-            <PrivateRoute>
-              <ProjectLayout />
-            </PrivateRoute>
-          }
+          element={<PrivateRoute><ProjectLayout /></PrivateRoute>}
         >
           <Route index element={<ProjectBoard />} />
+          <Route path="backlog" element={<Backlog />} />
+          <Route path="timeline" element={<Timeline />} />
+          <Route path="reports" element={<Reports />} />
+          <Route path="releases" element={<Releases />} />
+          <Route path="settings" element={<ProjectSettings />} />
           <Route path="chat" element={<ProjectChat />} />
           <Route path="activity" element={<ProjectActivity />} />
         </Route>
-        <Route path="/billing" element={
-          <PrivateRoute>
-            <Billing />
-          </PrivateRoute>
-        } />
-        
       </Routes>
     </BrowserRouter>
-    
   )
 }
 

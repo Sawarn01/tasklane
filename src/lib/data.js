@@ -490,3 +490,504 @@ export async function removeLabelFromTask({ taskId, labelId }) {
   const { error } = await supabase.from('task_labels').delete().eq('task_id', taskId).eq('label_id', labelId)
   if (error) throw error
 }
+
+// ==================== SPRINTS ====================
+
+export async function getSprints(projectId) {
+  const { data, error } = await supabase
+    .from('sprints')
+    .select('*')
+    .eq('project_id', projectId)
+    .order('created_at', { ascending: true })
+  if (error) throw error
+  return data
+}
+
+export async function createSprint({ projectId, name, goal, startDate, endDate, userId }) {
+  const { data, error } = await supabase
+    .from('sprints')
+    .insert({
+      project_id: projectId,
+      name,
+      goal: goal || null,
+      start_date: startDate || null,
+      end_date: endDate || null,
+      status: 'planning',
+      created_by: userId,
+    })
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function updateSprint({ sprintId, name, goal, startDate, endDate }) {
+  const { error } = await supabase
+    .from('sprints')
+    .update({ name, goal: goal || null, start_date: startDate || null, end_date: endDate || null })
+    .eq('id', sprintId)
+  if (error) throw error
+}
+
+export async function startSprint(sprintId) {
+  const { error } = await supabase
+    .from('sprints')
+    .update({ status: 'active' })
+    .eq('id', sprintId)
+  if (error) throw error
+}
+
+export async function completeSprint(sprintId) {
+  const { error } = await supabase
+    .from('sprints')
+    .update({ status: 'completed' })
+    .eq('id', sprintId)
+  if (error) throw error
+}
+
+// ==================== ISSUE TYPES & STORY POINTS ====================
+
+export async function updateTaskIssueType({ taskId, issueType }) {
+  const { error } = await supabase
+    .from('tasks')
+    .update({ issue_type: issueType, updated_at: new Date().toISOString() })
+    .eq('id', taskId)
+  if (error) throw error
+}
+
+export async function updateTaskStoryPoints({ taskId, storyPoints }) {
+  const { error } = await supabase
+    .from('tasks')
+    .update({ story_points: storyPoints === '' ? null : Number(storyPoints), updated_at: new Date().toISOString() })
+    .eq('id', taskId)
+  if (error) throw error
+}
+
+export async function updateTaskSprint({ taskId, sprintId }) {
+  const { error } = await supabase
+    .from('tasks')
+    .update({ sprint_id: sprintId || null, updated_at: new Date().toISOString() })
+    .eq('id', taskId)
+  if (error) throw error
+}
+
+export async function updateTaskParent({ taskId, parentId }) {
+  const { error } = await supabase
+    .from('tasks')
+    .update({ parent_id: parentId || null, updated_at: new Date().toISOString() })
+    .eq('id', taskId)
+  if (error) throw error
+}
+
+export async function getProject(projectId) {
+  const { data, error } = await supabase
+    .from('projects')
+    .select('*')
+    .eq('id', projectId)
+    .single()
+  if (error) throw error
+  return data
+}
+
+// ==================== ISSUE LINKS ====================
+
+export async function getIssueLinks(taskId) {
+  const { data, error } = await supabase
+    .from('issue_links')
+    .select('id, link_type, from_task_id, to_task_id')
+    .or(`from_task_id.eq.${taskId},to_task_id.eq.${taskId}`)
+  if (error) throw error
+  return data
+}
+
+export async function addIssueLink({ fromTaskId, toTaskId, linkType }) {
+  const { error } = await supabase
+    .from('issue_links')
+    .insert({ from_task_id: fromTaskId, to_task_id: toTaskId, link_type: linkType })
+  if (error) throw error
+}
+
+export async function removeIssueLink(linkId) {
+  const { error } = await supabase.from('issue_links').delete().eq('id', linkId)
+  if (error) throw error
+}
+
+// ==================== COMPONENTS ====================
+
+export async function getProjectComponents(projectId) {
+  const { data, error } = await supabase
+    .from('components')
+    .select('*')
+    .eq('project_id', projectId)
+    .order('name')
+  if (error) throw error
+  return data
+}
+
+export async function createComponent({ projectId, name }) {
+  const { data, error } = await supabase
+    .from('components')
+    .insert({ project_id: projectId, name })
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function getTaskComponents(taskId) {
+  const { data, error } = await supabase
+    .from('task_components')
+    .select('component_id, components(*)')
+    .eq('task_id', taskId)
+  if (error) throw error
+  return data.map((tc) => tc.components)
+}
+
+export async function addComponentToTask({ taskId, componentId }) {
+  const { error } = await supabase.from('task_components').insert({ task_id: taskId, component_id: componentId })
+  if (error) throw error
+}
+
+export async function removeComponentFromTask({ taskId, componentId }) {
+  const { error } = await supabase
+    .from('task_components')
+    .delete()
+    .eq('task_id', taskId)
+    .eq('component_id', componentId)
+  if (error) throw error
+}
+
+// ==================== VERSIONS / RELEASES ====================
+
+export async function getProjectVersions(projectId) {
+  const { data, error } = await supabase
+    .from('versions')
+    .select('*')
+    .eq('project_id', projectId)
+    .order('created_at')
+  if (error) throw error
+  return data
+}
+
+export async function createVersion({ projectId, name, releaseDate, status = 'unreleased', description }) {
+  const { data, error } = await supabase
+    .from('versions')
+    .insert({ project_id: projectId, name, release_date: releaseDate || null, status, description: description || null })
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function updateVersion({ versionId, name, releaseDate, status, description }) {
+  const { error } = await supabase
+    .from('versions')
+    .update({ name, release_date: releaseDate || null, status, description: description || null })
+    .eq('id', versionId)
+  if (error) throw error
+}
+
+export async function deleteVersion(versionId) {
+  const { error } = await supabase.from('versions').delete().eq('id', versionId)
+  if (error) throw error
+}
+
+export async function updateTaskVersion({ taskId, versionId }) {
+  const { error } = await supabase
+    .from('tasks')
+    .update({ fix_version_id: versionId || null, updated_at: new Date().toISOString() })
+    .eq('id', taskId)
+  if (error) throw error
+}
+
+// ==================== GLOBAL SEARCH ====================
+
+export async function searchIssues({ query, projectId }) {
+  let q = supabase
+    .from('tasks')
+    .select('id, title, status, priority, project_id, created_at')
+    .ilike('title', `%${query}%`)
+  if (projectId) q = q.eq('project_id', projectId)
+  const { data, error } = await q.order('created_at', { ascending: false }).limit(20)
+  if (error) throw error
+  return data
+}
+
+// ==================== WATCHERS ====================
+
+export async function getTaskWatchers(taskId) {
+  const { data, error } = await supabase
+    .from('task_watchers')
+    .select('user_id, profiles(full_name)')
+    .eq('task_id', taskId)
+  if (error) throw error
+  return data
+}
+
+export async function watchTask({ taskId, userId }) {
+  const { error } = await supabase
+    .from('task_watchers')
+    .insert({ task_id: taskId, user_id: userId })
+  if (error && error.code !== '23505') throw error
+}
+
+export async function unwatchTask({ taskId, userId }) {
+  const { error } = await supabase
+    .from('task_watchers')
+    .delete()
+    .eq('task_id', taskId)
+    .eq('user_id', userId)
+  if (error) throw error
+}
+
+// ==================== TIME TRACKING ====================
+
+export async function logTime({ taskId, userId, minutes, description }) {
+  const { error } = await supabase
+    .from('time_logs')
+    .insert({ task_id: taskId, user_id: userId, minutes, description: description || null })
+  if (error) throw error
+}
+
+export async function getTaskTimeLogs(taskId) {
+  const { data, error } = await supabase
+    .from('time_logs')
+    .select('*, profiles(full_name)')
+    .eq('task_id', taskId)
+    .order('created_at', { ascending: false })
+  if (error) throw error
+  return data
+}
+
+// ==================== EPICS ====================
+
+export async function getProjectEpics(projectId) {
+  const { data, error } = await supabase
+    .from('tasks')
+    .select('id, title, status, priority, story_points')
+    .eq('project_id', projectId)
+    .eq('issue_type', 'epic')
+    .order('created_at')
+  if (error) throw error
+  return data
+}
+
+export async function getChildIssues(parentId) {
+  const { data, error } = await supabase
+    .from('tasks')
+    .select('*')
+    .eq('parent_id', parentId)
+    .order('position')
+  if (error) throw error
+  return data
+}
+
+// ==================== PROJECT MANAGEMENT ====================
+
+export async function updateProject({ projectId, name, description }) {
+  const { error } = await supabase
+    .from('projects')
+    .update({ name, description })
+    .eq('id', projectId)
+  if (error) throw error
+}
+
+export async function getOrgMembers(orgId) {
+  const { data, error } = await supabase
+    .from('org_members')
+    .select('user_id, role, profiles(id, full_name, avatar_url)')
+    .eq('org_id', orgId)
+  if (error) throw error
+  return data.map((m) => ({ ...m.profiles, role: m.role }))
+}
+
+export async function addProjectMember({ projectId, userId }) {
+  const { error } = await supabase
+    .from('project_members')
+    .insert({ project_id: projectId, user_id: userId })
+  if (error && error.code !== '23505') throw error
+}
+
+export async function removeProjectMember({ projectId, userId }) {
+  const { error } = await supabase
+    .from('project_members')
+    .delete()
+    .eq('project_id', projectId)
+    .eq('user_id', userId)
+  if (error) throw error
+}
+
+// ==================== HELPERS ====================
+
+export function getProjectKey(projectName) {
+  if (!projectName) return 'PROJ'
+  const words = projectName.replace(/[^a-zA-Z0-9\s]/g, '').split(/\s+/).filter(Boolean)
+  if (words.length === 1) return words[0].slice(0, 4).toUpperCase()
+  return words.map((w) => w[0]).join('').slice(0, 4).toUpperCase()
+}
+
+// ==================== USER PROFILE ====================
+
+export async function getMyProfile(userId) {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', userId)
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function updateMyProfile({ userId, fullName, avatarUrl }) {
+  const updates = { full_name: fullName }
+  if (avatarUrl !== undefined) updates.avatar_url = avatarUrl
+  const { error } = await supabase
+    .from('profiles')
+    .update(updates)
+    .eq('id', userId)
+  if (error) throw error
+}
+
+export async function uploadAvatar({ userId, file }) {
+  const ext = file.name.split('.').pop()
+  const path = `${userId}/avatar.${ext}`
+  const { error: uploadError } = await supabase.storage
+    .from('avatars')
+    .upload(path, file, { upsert: true })
+  if (uploadError) throw uploadError
+  const { data } = supabase.storage.from('avatars').getPublicUrl(path)
+  return data.publicUrl
+}
+
+export async function updateUserEmail({ email }) {
+  const { error } = await supabase.auth.updateUser({ email })
+  if (error) throw error
+}
+
+export async function updateUserPassword({ password }) {
+  const { error } = await supabase.auth.updateUser({ password })
+  if (error) throw error
+}
+
+// ==================== ORG SETTINGS ====================
+
+export async function updateOrgName({ orgId, name }) {
+  const { error } = await supabase
+    .from('organizations')
+    .update({ name })
+    .eq('id', orgId)
+  if (error) throw error
+}
+
+export async function updateOrgMemberRole({ orgId, userId, role }) {
+  const { error } = await supabase
+    .from('org_members')
+    .update({ role })
+    .eq('org_id', orgId)
+    .eq('user_id', userId)
+  if (error) throw error
+}
+
+export async function removeOrgMember({ orgId, userId }) {
+  const { error } = await supabase
+    .from('org_members')
+    .delete()
+    .eq('org_id', orgId)
+    .eq('user_id', userId)
+  if (error) throw error
+}
+
+// ==================== DASHBOARD ====================
+
+export async function getProjectsWithStats(orgId) {
+  const { data, error } = await supabase
+    .from('projects')
+    .select('id, name, description, created_at, tasks(status)')
+    .eq('org_id', orgId)
+    .order('created_at', { ascending: false })
+  if (error) throw error
+  return data.map((p) => {
+    const tasks = p.tasks || []
+    return {
+      id: p.id,
+      name: p.name,
+      description: p.description,
+      created_at: p.created_at,
+      totalTasks: tasks.length,
+      doneTasks: tasks.filter((t) => t.status === 'done').length,
+      inProgressTasks: tasks.filter((t) => t.status === 'in_progress').length,
+      todoTasks: tasks.filter((t) => t.status === 'todo').length,
+    }
+  })
+}
+
+export async function getMyAssignedTasks(userId) {
+  const { data, error } = await supabase
+    .from('tasks')
+    .select('id, title, status, priority, issue_type, story_points, due_date, project_id, projects(name)')
+    .eq('assignee_id', userId)
+    .neq('status', 'done')
+    .order('updated_at', { ascending: false })
+    .limit(15)
+  if (error) throw error
+  return data
+}
+
+export async function getMyOrgActivity() {
+  const { data, error } = await supabase
+    .from('activity_log')
+    .select('*, profiles(full_name), projects(name)')
+    .order('created_at', { ascending: false })
+    .limit(25)
+  if (error) throw error
+  return data
+}
+
+export async function cloneTask(task, userId) {
+  const { data: existing } = await supabase
+    .from('tasks')
+    .select('position')
+    .eq('project_id', task.project_id)
+    .eq('status', task.status)
+    .order('position', { ascending: false })
+    .limit(1)
+  const position = existing?.length ? existing[0].position + 1 : 1
+
+  const { data, error } = await supabase
+    .from('tasks')
+    .insert({
+      project_id:   task.project_id,
+      title:        `Copy of ${task.title}`,
+      description:  task.description || null,
+      status:       task.status,
+      priority:     task.priority || null,
+      issue_type:   task.issue_type || 'task',
+      story_points: task.story_points || null,
+      assignee_id:  task.assignee_id || null,
+      sprint_id:    task.sprint_id || null,
+      parent_id:    task.parent_id || null,
+      created_by:   userId,
+      position,
+    })
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function getWipLimits(projectId) {
+  const { data } = await supabase
+    .from('projects')
+    .select('wip_limits')
+    .eq('id', projectId)
+    .single()
+  return data?.wip_limits || {}
+}
+
+export async function saveWipLimits(projectId, wipLimits) {
+  const { error } = await supabase
+    .from('projects')
+    .update({ wip_limits: wipLimits })
+    .eq('id', projectId)
+  if (error) throw error
+}
