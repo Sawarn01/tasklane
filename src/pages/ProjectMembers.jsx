@@ -35,11 +35,12 @@ export default function ProjectMembers() {
         getTasks(projectId),
         getMyOrg(),
       ])
+      const org = o?.org ?? o        // getMyOrg returns { org, role }
       setMembers(mem)
       setTasks(tsk)
-      setOrg(o)
-      if (o) {
-        const om = await getOrgMembers(o.id)
+      setOrg(org)
+      if (org?.id) {
+        const om = await getOrgMembers(org.id)
         setOrgMembers(om)
       }
     } finally {
