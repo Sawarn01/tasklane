@@ -10,11 +10,13 @@ import {
   getProjectComponents, getTaskComponents, addComponentToTask, removeComponentFromTask,
   getIssueLinks, addIssueLink, removeIssueLink, getTasks, getChildIssues,
   getTaskWatchers, watchTask, unwatchTask, logTime, getTaskTimeLogs, createTask, cloneTask,
+  updateTaskEstimate,
 } from '../lib/data'
 import { supabase } from '../lib/supabase'
 import { formatActivity, formatTimeAgo } from '../lib/activityFormat'
 import { IssueTypeIcon, PriorityIcon, StatusBadge, ISSUE_TYPES, PRIORITIES, STATUSES } from '../components/IssueIcons'
 import { useMentionState, MentionDropdown, renderWithMentions } from '../components/MentionInput'
+import { MarkdownEditor, renderMarkdown } from '../components/MarkdownEditor'
 
 const LABEL_COLORS = ['#6E56CF', '#36D399', '#F59E0B', '#EF4444', '#3B82F6', '#EC4899', '#8B5CF6']
 const LINK_TYPES = ['blocks', 'is_blocked_by', 'relates_to', 'duplicates', 'is_duplicated_by', 'clones', 'is_cloned_by']
@@ -81,6 +83,7 @@ export default function TaskDetailPanel({ task, members, orgPlan, projectKey, on
   const [showTimeModal, setShowTimeModal] = useState(false)
   const [logMinutes, setLogMinutes] = useState('')
   const [logDesc, setLogDesc] = useState('')
+  const [estimate, setEstimate] = useState(task.original_estimate ? String(Math.round(task.original_estimate / 60 * 10) / 10) : '')
   const [saving, setSaving] = useState({})
   const [title, setTitle] = useState(task.title)
   const [editingTitle, setEditingTitle] = useState(false)
@@ -211,6 +214,14 @@ export default function TaskDetailPanel({ task, members, orgPlan, projectKey, on
   async function handleDescriptionBlur() {
     if (description === task.description) return
     await save('description', () => updateTaskDescription({ taskId: task.id, description }))
+  }
+
+  async function handleEstimateBlur() {
+    const hours = parseFloat(estimate)
+    const minutes = isNaN(hours) ? null : Math.round(hours * 60)
+    const existing = task.original_estimate ? Math.round(task.original_estimate / 60 * 10) / 10 : null
+    if (String(hours) === String(existing)) return
+    await save('estimate', () => updateTaskEstimate({ taskId: task.id, minutes }))
   }
 
   async function handleSprintChange(e) {
@@ -449,13 +460,11 @@ export default function TaskDetailPanel({ task, members, orgPlan, projectKey, on
 
             {/* Description */}
             <Field label="Description">
-              <textarea
+              <MarkdownEditor
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 onBlur={handleDescriptionBlur}
-                rows={5}
-                placeholder="Add a description…"
-                className="w-full text-sm rounded-xl border border-black/8 px-3 py-2.5 resize-none focus:outline-none focus:ring-2 focus:ring-violet/30 bg-paper-dim placeholder-slate-muted/60"
+                minRows={4}
               />
               {saving.description && <p className="text-[10px] text-violet font-mono mt-1 animate-pulse">saving…</p>}
             </Field>
@@ -536,6 +545,40 @@ export default function TaskDetailPanel({ task, members, orgPlan, projectKey, on
 
             {/* Time tracking */}
             <Field label={`Time tracking${totalTimeLogged > 0 ? ` · ${Math.round(totalTimeLogged / 60 * 10) / 10}h logged` : ''}`}>
+              {/* Estimate row */}
+              <div className="flex items-center gap-2 mb-2">
+                <label className="text-[10px] font-mono text-slate-muted uppercase tracking-wide w-16 shrink-0">Estimate</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.5"
+                  value={estimate}
+                  onChange={(e) => setEstimate(e.target.value)}
+                  onBlur={handleEstimateBlur}
+                  placeholder="0"
+                  className="w-16 text-xs border border-black/10 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-violet/30 font-mono text-center"
+                />
+                <span className="text-[10px] text-slate-muted">hours</span>
+                {saving.estimate && <span className="text-[9px] text-violet font-mono animate-pulse">saving…</span>}
+              </div>
+              {/* Progress bar if both estimate and logged */}
+              {estimate && totalTimeLogged > 0 && (
+                <div className="mb-2">
+                  <div className="h-1.5 bg-paper-dim rounded-full overflow-hidden">
+                    <div
+                      className="h-full rounded-full transition-all"
+                      style={{
+                        width: `${Math.min((totalTimeLogged / (parseFloat(estimate) * 60)) * 100, 100)}%`,
+                        backgroundColor: totalTimeLogged > parseFloat(estimate) * 60 ? '#EF4444' : '#36D399',
+                      }}
+                    />
+                  </div>
+                  <p className="text-[9px] text-slate-muted font-mono mt-0.5">
+                    {Math.round(totalTimeLogged / 60 * 10) / 10}h / {estimate}h
+                    {totalTimeLogged > parseFloat(estimate) * 60 && <span className="text-red-500 ml-1">over estimate</span>}
+                  </p>
+                </div>
+              )}
               <button onClick={() => setShowTimeModal(true)} className="text-xs text-violet hover:opacity-80 flex items-center gap-1 mb-2">
                 <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="6" cy="6" r="5" stroke="currentColor" strokeWidth="1.3" /><path d="M6 3.5V6l2 1.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" /></svg>
                 Log time

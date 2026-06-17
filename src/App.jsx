@@ -16,6 +16,8 @@ import LandingPage from './pages/LandingPage'
 import ProjectActivity from './pages/ProjectActivity'
 import UserProfile from './pages/UserProfile'
 import OrgSettings from './pages/OrgSettings'
+import ProjectHome from './pages/ProjectHome'
+import ProjectMembers from './pages/ProjectMembers'
 
 function PrivateRoute({ children }) {
   const { user, loading } = useAuth()
@@ -51,12 +53,14 @@ function App() {
           element={<PrivateRoute><ProjectLayout /></PrivateRoute>}
         >
           <Route index element={<ProjectBoard />} />
-          <Route path="backlog" element={<Backlog />} />
+          <Route path="home"     element={<ProjectHome />} />
+          <Route path="members"  element={<ProjectMembers />} />
+          <Route path="backlog"  element={<Backlog />} />
           <Route path="timeline" element={<Timeline />} />
-          <Route path="reports" element={<Reports />} />
+          <Route path="reports"  element={<Reports />} />
           <Route path="releases" element={<Releases />} />
           <Route path="settings" element={<ProjectSettings />} />
-          <Route path="chat" element={<ProjectChat />} />
+          <Route path="chat"     element={<ProjectChat />} />
           <Route path="activity" element={<ProjectActivity />} />
         </Route>
       </Routes>

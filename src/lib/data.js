@@ -991,3 +991,25 @@ export async function saveWipLimits(projectId, wipLimits) {
     .eq('id', projectId)
   if (error) throw error
 }
+
+// ==================== TASK ESTIMATE ====================
+
+export async function updateTaskEstimate({ taskId, minutes }) {
+  const { error } = await supabase
+    .from('tasks')
+    .update({ original_estimate: minutes || null, updated_at: new Date().toISOString() })
+    .eq('id', taskId)
+  if (error) throw error
+}
+
+// ==================== PROJECT OVERVIEW ====================
+
+export async function getProjectOverview(projectId) {
+  const [tasks, sprints, members, activity] = await Promise.all([
+    getTasks(projectId),
+    getSprints(projectId),
+    getProjectMembers(projectId),
+    getProjectActivity(projectId),
+  ])
+  return { tasks, sprints, members, activity: activity.slice(0, 15) }
+}

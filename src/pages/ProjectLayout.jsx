@@ -14,6 +14,12 @@ import { formatTimeAgo } from '../lib/activityFormat'
 // ── Nav config ───────────────────────────────────────────────────
 const NAV_ITEMS = [
   {
+    group: 'Overview',
+    items: [
+      { key: 'home',     label: 'Home',     path: '/home',     icon: HomeIcon },
+    ],
+  },
+  {
     group: 'Planning',
     items: [
       { key: 'board',    label: 'Board',    path: '',          icon: BoardIcon },
@@ -26,6 +32,7 @@ const NAV_ITEMS = [
     items: [
       { key: 'chat',     label: 'Chat',     path: '/chat',     icon: ChatIcon },
       { key: 'activity', label: 'Activity', path: '/activity', icon: ActivityIcon },
+      { key: 'members',  label: 'Members',  path: '/members',  icon: MembersIcon },
     ],
   },
   {
@@ -44,6 +51,23 @@ const NAV_ITEMS = [
 ]
 
 // ── Icons ────────────────────────────────────────────────────────
+function HomeIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+      <path d="M1 6.5L7 1.5l6 5V13H9V9H5v4H1V6.5z" fill="currentColor" opacity="0.7" />
+    </svg>
+  )
+}
+function MembersIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+      <circle cx="5" cy="4.5" r="2.5" fill="currentColor" opacity="0.7" />
+      <path d="M1 12c0-2.2 1.8-4 4-4s4 1.8 4 4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" fill="none" opacity="0.7" />
+      <circle cx="10" cy="4.5" r="1.8" fill="currentColor" opacity="0.4" />
+      <path d="M11.5 10.5c0-1.4-.8-2.5-1.8-3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" fill="none" opacity="0.4" />
+    </svg>
+  )
+}
 function BoardIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 14 14" fill="none">

@@ -344,22 +344,57 @@ export default function Reports() {
         <div className="bg-white rounded-2xl border border-black/5 p-5 shadow-sm">
           <p className="font-semibold text-ink text-sm mb-4">Status breakdown</p>
           <div className="grid grid-cols-4 gap-3">
-            {['todo', 'in_progress', 'review', 'done'].map((status) => {
+            {['todo', 'in_progress', 'in_review', 'done'].map((status) => {
               const count = tasks.filter((t) => t.status === status).length
               const pct = total > 0 ? Math.round((count / total) * 100) : 0
-              const colors = { todo: '#8A8F98', in_progress: '#6E56CF', review: '#F59E0B', done: '#36D399' }
+              const colors = { todo: '#8A8F98', in_progress: '#6E56CF', in_review: '#F59E0B', done: '#36D399' }
               return (
                 <div key={status} className="text-center p-3 rounded-xl bg-paper-dim">
                   <div className="w-8 h-8 rounded-full mx-auto mb-2 flex items-center justify-center" style={{ backgroundColor: `${colors[status]}20` }}>
                     <div className="w-3 h-3 rounded-full" style={{ backgroundColor: colors[status] }} />
                   </div>
-                  <p className="font-mono text-[9px] uppercase tracking-wider text-slate-muted">{status.replace('_', ' ')}</p>
+                  <p className="font-mono text-[9px] uppercase tracking-wider text-slate-muted">{status.replace(/_/g, ' ')}</p>
                   <p className="text-xl font-bold text-ink mt-1">{count}</p>
                   <p className="text-[10px] text-slate-muted">{pct}%</p>
                 </div>
               )
             })}
           </div>
+        </div>
+
+        {/* Priority breakdown */}
+        <div className="bg-white rounded-2xl border border-black/5 p-5 shadow-sm">
+          <p className="font-semibold text-ink text-sm mb-1">Priority distribution</p>
+          <p className="text-xs text-slate-muted mb-4">Open issues by priority level</p>
+          <div className="space-y-2.5">
+            {[
+              { key: 'urgent', label: 'Urgent', color: '#EF4444' },
+              { key: 'high',   label: 'High',   color: '#F97316' },
+              { key: 'medium', label: 'Medium', color: '#6E56CF' },
+              { key: 'low',    label: 'Low',    color: '#8A8F98' },
+            ].map(({ key, label, color }) => {
+              const count = tasks.filter(t => (t.priority || 'medium') === key && t.status !== 'done').length
+              const max   = Math.max(...['urgent','high','medium','low'].map(k => tasks.filter(t => (t.priority||'medium') === k && t.status !== 'done').length), 1)
+              return (
+                <div key={key} className="flex items-center gap-3">
+                  <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: color }} />
+                  <span className="text-xs text-slate-muted w-14">{label}</span>
+                  <div className="flex-1 h-2 bg-paper-dim rounded-full overflow-hidden">
+                    <motion.div
+                      initial={{ width: 0 }} animate={{ width: `${(count / max) * 100}%` }}
+                      transition={{ duration: 0.5 }}
+                      className="h-full rounded-full"
+                      style={{ backgroundColor: color }}
+                    />
+                  </div>
+                  <span className="font-mono text-xs text-slate-muted w-6 text-right">{count}</span>
+                </div>
+              )
+            })}
+          </div>
+          {tasks.filter(t => t.status !== 'done').length === 0 && (
+            <p className="text-sm text-slate-muted text-center mt-4">No open issues</p>
+          )}
         </div>
       </div>
     </div>
