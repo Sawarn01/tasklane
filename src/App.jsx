@@ -19,6 +19,7 @@ import OrgSettings from './pages/OrgSettings'
 import ProjectHome from './pages/ProjectHome'
 import ProjectMembers from './pages/ProjectMembers'
 import MyWork from './pages/MyWork'
+import Notifications from './pages/Notifications'
 
 function PrivateRoute({ children }) {
   const { user, loading } = useAuth()
@@ -45,7 +46,8 @@ function App() {
         <Route path="/login" element={<Login />} />
 
         <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
-        <Route path="/my-work"   element={<PrivateRoute><MyWork /></PrivateRoute>} />
+        <Route path="/my-work"       element={<PrivateRoute><MyWork /></PrivateRoute>} />
+        <Route path="/notifications" element={<PrivateRoute><Notifications /></PrivateRoute>} />
         <Route path="/billing" element={<PrivateRoute><Billing /></PrivateRoute>} />
         <Route path="/profile" element={<PrivateRoute><UserProfile /></PrivateRoute>} />
         <Route path="/org/settings" element={<PrivateRoute><OrgSettings /></PrivateRoute>} />

@@ -448,7 +448,44 @@ export default function Backlog() {
             Clear filters
           </button>
         )}
-        <div className="ml-auto">
+        <div className="ml-auto flex items-center gap-2">
+          {/* CSV Export */}
+          <button
+            onClick={() => {
+              const allVisible = [
+                ...sprints.flatMap(s => tasks.filter(t => t.sprint_id === s.id).filter(matchesFilter).map(t => ({ ...t, sprint: s.name }))),
+                ...backlogTasks.map(t => ({ ...t, sprint: 'Backlog' })),
+              ]
+              const header = ['Key', 'Title', 'Type', 'Status', 'Priority', 'Sprint', 'Story Points', 'Due Date', 'Assignee']
+              const rows = allVisible.map((t, i) => [
+                `${projectKey}-${i + 1}`,
+                `"${(t.title || '').replace(/"/g, '""')}"`,
+                t.issue_type || 'task',
+                t.status,
+                t.priority || 'medium',
+                t.sprint || 'Backlog',
+                t.story_points ?? '',
+                t.due_date ? new Date(t.due_date).toLocaleDateString() : '',
+                members.find(m => m.id === t.assignee_id)?.full_name || '',
+              ])
+              const csv = [header, ...rows].map(r => r.join(',')).join('\n')
+              const blob = new Blob([csv], { type: 'text/csv' })
+              const url  = URL.createObjectURL(blob)
+              const a    = document.createElement('a')
+              a.href     = url
+              a.download = `${projectKey}-backlog.csv`
+              a.click()
+              URL.revokeObjectURL(url)
+            }}
+            className="flex items-center gap-1.5 text-xs border border-black/10 text-slate-muted rounded-lg px-3 py-1.5 hover:text-ink hover:border-black/20 transition-colors"
+            title="Export to CSV"
+          >
+            <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
+              <path d="M5.5 1v6M3 5l2.5 2.5L8 5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M1 9h9" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+            </svg>
+            Export CSV
+          </button>
           <button
             onClick={() => setShowSprintModal(true)}
             className="flex items-center gap-1.5 text-xs bg-violet text-white rounded-lg px-3 py-1.5 hover:bg-violet/90 transition-colors font-medium"

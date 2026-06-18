@@ -53,7 +53,7 @@ function AssigneeAvatar({ assigneeId, members, size = 20 }) {
 
 const PRIORITY_STRIPE = { urgent: '#EF4444', high: '#F59E0B', medium: '#6E56CF', low: '#8A8F9840' }
 
-function TaskCard({ task, onClick, labels, projectKey, index, members, isSelected, onToggleSelect, anySelected }) {
+function TaskCard({ task, onClick, labels, projectKey, index, members, isSelected, onToggleSelect, anySelected, compact }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id })
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.3 : 1 }
   const isOverdue = task.due_date && task.status !== 'done' && new Date(task.due_date) < new Date(new Date().toDateString())
@@ -68,78 +68,99 @@ function TaskCard({ task, onClick, labels, projectKey, index, members, isSelecte
       layout={!isDragging}
       transition={{ layout: { duration: 0.18, ease: 'easeOut' } }}
       onClick={() => { if (anySelected) { onToggleSelect(task.id) } else { onClick(task) } }}
-      className={`bg-white border rounded-xl p-3 mb-2 shadow-sm cursor-grab active:cursor-grabbing group transition-all hover:shadow-md overflow-hidden relative ${
-        isDragging ? 'shadow-xl rotate-[-1deg]' : ''
-      } ${task.status === 'done' ? 'opacity-70' : ''} ${
+      className={`bg-white border rounded-xl overflow-hidden relative cursor-grab active:cursor-grabbing group transition-all hover:shadow-md ${
+        compact ? 'px-2.5 py-1.5 mb-1 shadow-none' : 'p-3 mb-2 shadow-sm'
+      } ${isDragging ? 'shadow-xl -rotate-1' : ''} ${task.status === 'done' ? 'opacity-70' : ''} ${
         isSelected ? 'border-violet/50 ring-1 ring-violet/20 bg-violet/2' : 'border-black/5 hover:border-black/10'
       }`}
     >
       {/* Priority stripe */}
       <div className="absolute left-0 top-2 bottom-2 w-0.75 rounded-full" style={{ backgroundColor: stripeColor }} />
-      {/* Select checkbox — visible on hover or when something is selected */}
-      <div className="flex items-start gap-2">
-        <div
-          className={`mt-0.5 shrink-0 transition-opacity ${anySelected || isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
-          onMouseDown={e => e.stopPropagation()}
-          onClick={e => { e.stopPropagation(); onToggleSelect(task.id, e) }}
-        >
-          <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center transition-colors ${
-            isSelected ? 'bg-violet border-violet' : 'border-black/20 hover:border-violet/60'
-          }`}>
-            {isSelected && <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M1 4l2 2 4-3" stroke="white" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /></svg>}
+
+      {compact ? (
+        /* ── Compact layout ── */
+        <div className="flex items-center gap-1.5 pl-2">
+          <div
+            className={`shrink-0 transition-opacity ${anySelected || isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+            onMouseDown={e => e.stopPropagation()}
+            onClick={e => { e.stopPropagation(); onToggleSelect(task.id, e) }}
+          >
+            <div className={`w-3 h-3 rounded border flex items-center justify-center transition-colors ${
+              isSelected ? 'bg-violet border-violet' : 'border-black/20 hover:border-violet/60'
+            }`}>
+              {isSelected && <svg width="6" height="6" viewBox="0 0 8 8" fill="none"><path d="M1 4l2 2 4-3" stroke="white" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></svg>}
+            </div>
+          </div>
+          <IssueTypeIcon type={task.issue_type || 'task'} size={11} />
+          <span className={`text-xs text-ink flex-1 truncate ${task.status === 'done' ? 'line-through text-slate-muted' : ''}`}>
+            {task.title}
+          </span>
+          <div className="flex items-center gap-1 shrink-0">
+            {task.story_points != null && <span className="font-mono text-[9px] text-slate-muted">{task.story_points}p</span>}
+            {task.assignee_id && <AssigneeAvatar assigneeId={task.assignee_id} members={members} size={16} />}
           </div>
         </div>
-
-        <div className="flex-1 min-w-0">
-          {/* Labels */}
-          {labels && labels.length > 0 && (
-            <div className="flex flex-wrap gap-1 mb-1.5">
-              {labels.map((label) => (
-                <span key={label.id}
-                  className="text-[9px] font-mono uppercase tracking-wide px-1.5 py-0.5 rounded-full font-semibold"
-                  style={{ backgroundColor: `${label.color}20`, color: label.color }}
-                >{label.name}</span>
-              ))}
+      ) : (
+        /* ── Normal layout ── */
+        <div className="flex items-start gap-2">
+          <div
+            className={`mt-0.5 shrink-0 transition-opacity ${anySelected || isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+            onMouseDown={e => e.stopPropagation()}
+            onClick={e => { e.stopPropagation(); onToggleSelect(task.id, e) }}
+          >
+            <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center transition-colors ${
+              isSelected ? 'bg-violet border-violet' : 'border-black/20 hover:border-violet/60'
+            }`}>
+              {isSelected && <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M1 4l2 2 4-3" stroke="white" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /></svg>}
             </div>
-          )}
-
-          {/* Title row */}
-          <div className="flex items-start gap-2">
-            <IssueTypeIcon type={task.issue_type || 'task'} size={13} />
-            <p className={`text-sm font-medium text-ink leading-snug flex-1 ${task.status === 'done' ? 'line-through text-slate-muted' : ''}`}>
-              {task.title}
-            </p>
-            {task.story_points != null && (
-              <span className="shrink-0 font-mono text-[10px] bg-paper-dim text-slate-muted px-1.5 py-0.5 rounded ml-1">
-                {task.story_points}
-              </span>
-            )}
           </div>
 
-          {/* Footer */}
-          <div className="flex items-center justify-between mt-2.5">
-            <div className="flex items-center gap-2">
-              <span className="font-mono text-[9px] text-slate-muted/50 uppercase tracking-wider">
-                {projectKey}-{index + 1}
-              </span>
-              {task.due_date && (
-                <span className={`font-mono text-[9px] uppercase tracking-wide ${isOverdue ? 'text-red-500' : 'text-slate-muted/60'}`}>
-                  {isOverdue ? '⚠ ' : ''}{new Date(task.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+          <div className="flex-1 min-w-0">
+            {labels && labels.length > 0 && (
+              <div className="flex flex-wrap gap-1 mb-1.5">
+                {labels.map((label) => (
+                  <span key={label.id}
+                    className="text-[9px] font-mono uppercase tracking-wide px-1.5 py-0.5 rounded-full font-semibold"
+                    style={{ backgroundColor: `${label.color}20`, color: label.color }}
+                  >{label.name}</span>
+                ))}
+              </div>
+            )}
+
+            <div className="flex items-start gap-2">
+              <IssueTypeIcon type={task.issue_type || 'task'} size={13} />
+              <p className={`text-sm font-medium text-ink leading-snug flex-1 ${task.status === 'done' ? 'line-through text-slate-muted' : ''}`}>
+                {task.title}
+              </p>
+              {task.story_points != null && (
+                <span className="shrink-0 font-mono text-[10px] bg-paper-dim text-slate-muted px-1.5 py-0.5 rounded ml-1">
+                  {task.story_points}
                 </span>
               )}
             </div>
-            <div className="flex items-center gap-1.5">
-              <PriorityIcon priority={task.priority || 'medium'} size={11} />
-              {task.assignee_id && <AssigneeAvatar assigneeId={task.assignee_id} members={members} size={20} />}
+
+            <div className="flex items-center justify-between mt-2.5">
+              <div className="flex items-center gap-2">
+                <span className="font-mono text-[9px] text-slate-muted/50 uppercase tracking-wider">{projectKey}-{index + 1}</span>
+                {task.due_date && (
+                  <span className={`font-mono text-[9px] uppercase tracking-wide ${isOverdue ? 'text-red-500' : 'text-slate-muted/60'}`}>
+                    {isOverdue ? '⚠ ' : ''}{new Date(task.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-1.5">
+                <PriorityIcon priority={task.priority || 'medium'} size={11} />
+                {task.assignee_id && <AssigneeAvatar assigneeId={task.assignee_id} members={members} size={20} />}
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
     </motion.div>
   )
 }
 
-function Column({ column, tasks, onTaskClick, taskLabels, projectKey, members, onQuickAdd, collapsed, onToggleCollapse, wipLimit, selected, onToggleSelect }) {
+function Column({ column, tasks, onTaskClick, taskLabels, projectKey, members, onQuickAdd, collapsed, onToggleCollapse, wipLimit, selected, onToggleSelect, compact }) {
   const { setNodeRef } = useDroppable({ id: column.key })
   const overWip = wipLimit && tasks.length > wipLimit
 
@@ -219,6 +240,7 @@ function Column({ column, tasks, onTaskClick, taskLabels, projectKey, members, o
                   isSelected={selected?.has(task.id)}
                   onToggleSelect={onToggleSelect}
                   anySelected={selected?.size > 0}
+                  compact={compact}
                 />
               ))}
             </AnimatePresence>
@@ -234,7 +256,7 @@ function Column({ column, tasks, onTaskClick, taskLabels, projectKey, members, o
 const PRIORITY_ORDER = ['urgent', 'high', 'medium', 'low']
 const PRIORITY_ACCENTS = { urgent: '#EF4444', high: '#F59E0B', medium: '#6E56CF', low: '#8A8F98' }
 
-function SwimLaneRow({ label, color, tasks, column, onTaskClick, taskLabels, projectKey, members, selected, onToggleSelect }) {
+function SwimLaneRow({ label, color, tasks, column, onTaskClick, taskLabels, projectKey, members, selected, onToggleSelect, compact }) {
   const [collapsed, setCollapsed] = useState(false)
   const { setNodeRef } = useDroppable({ id: `${column.key}__${label}` })
 
@@ -283,6 +305,7 @@ function SwimLaneRow({ label, color, tasks, column, onTaskClick, taskLabels, pro
                     isSelected={selected?.has(task.id)}
                     onToggleSelect={onToggleSelect}
                     anySelected={selected?.size > 0}
+                    compact={compact}
                   />
                 ))}
               </AnimatePresence>
@@ -337,6 +360,7 @@ export default function ProjectBoard() {
   const [showCompleteModal, setShowCompleteModal] = useState(false)
   const [incompleteDisposition, setIncompleteDisposition] = useState({}) // taskId → 'backlog' | sprintId
   const [allSprints, setAllSprints]     = useState([])
+  const [compact, setCompact]           = useState(false)
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
 
@@ -725,6 +749,23 @@ export default function ProjectBoard() {
           </div>
         </div>
 
+        {/* Compact toggle */}
+        <button
+          onClick={() => setCompact(v => !v)}
+          title={compact ? 'Normal view' : 'Compact view'}
+          className={`flex items-center gap-1.5 text-xs rounded-lg px-2.5 py-1.5 border transition-colors ${
+            compact ? 'bg-ink text-white border-ink' : 'border-black/10 text-slate-muted hover:text-ink hover:border-black/20'
+          }`}
+        >
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+            <rect x="1" y="1.5" width="10" height="1.2" rx="0.6" fill="currentColor" />
+            <rect x="1" y="4.5" width="10" height="1.2" rx="0.6" fill="currentColor" opacity="0.7" />
+            <rect x="1" y="7.5" width="10" height="1.2" rx="0.6" fill="currentColor" opacity="0.5" />
+            <rect x="1" y="10" width="7"  height="1.2" rx="0.6" fill="currentColor" opacity="0.3" />
+          </svg>
+          {compact ? 'Compact' : 'Normal'}
+        </button>
+
         {/* Member filter avatars */}
         <div className="ml-auto flex items-center gap-1">
           {members.slice(0, 6).map((m) => (
@@ -892,6 +933,7 @@ export default function ProjectBoard() {
                           members={members}
                           selected={selected}
                           onToggleSelect={toggleSelect}
+                          compact={compact}
                         />
                       ))}
                     </div>
@@ -910,6 +952,7 @@ export default function ProjectBoard() {
                       wipLimit={wipLimits[column.key] || null}
                       selected={selected}
                       onToggleSelect={toggleSelect}
+                      compact={compact}
                     />
                   )}
 

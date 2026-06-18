@@ -5,7 +5,9 @@ import { useAuth } from '../lib/AuthContext'
 import {
   getMyOrg, getMyProjects, getProject, getProjectKey,
   getMyNotifications, markNotificationRead, markAllNotificationsRead,
+  createTask, getProjectMembers,
 } from '../lib/data'
+import { IssueTypeIcon } from '../components/IssueIcons'
 import { supabase } from '../lib/supabase'
 import GlobalSearch from '../components/GlobalSearch'
 import KbdShortcutsModal from '../components/KbdShortcutsModal'
@@ -214,6 +216,12 @@ function NotifDropdown({ notifications, onSelect, onMarkAll }) {
           </motion.button>
         ))}
       </div>
+      <button
+        onClick={() => navigate('/notifications')}
+        className="w-full py-2.5 text-center text-[11px] font-mono text-slate-muted hover:text-violet transition-colors border-t border-black/5"
+      >
+        View all notifications →
+      </button>
     </motion.div>
   )
 }
@@ -235,6 +243,14 @@ export default function ProjectLayout() {
   const [notifications, setNotifications]       = useState([])
   const [showNotifications, setShowNotifications] = useState(false)
   const notifRef = useRef(null)
+  // ── Quick create ────────────────────────────────────────────────
+  const [showQuickCreate, setShowQuickCreate]   = useState(false)
+  const [qcTitle, setQcTitle]                   = useState('')
+  const [qcType, setQcType]                     = useState('task')
+  const [qcPriority, setQcPriority]             = useState('medium')
+  const [qcAssignee, setQcAssignee]             = useState('')
+  const [qcCreating, setQcCreating]             = useState(false)
+  const [qcMembers, setQcMembers]               = useState([])
 
   useEffect(() => {
     getProject(projectId).then(setProject).catch(() => {})
@@ -280,10 +296,41 @@ export default function ProjectLayout() {
       if (e.key === '?' && !e.metaKey && !e.ctrlKey && !['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName)) {
         e.preventDefault(); setShowKbd((v) => !v)
       }
+      if (e.key === 'c' && !e.metaKey && !e.ctrlKey && !['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName)) {
+        e.preventDefault(); openQuickCreate()
+      }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [])
+
+  function openQuickCreate() {
+    setQcTitle(''); setQcType('task'); setQcPriority('medium'); setQcAssignee('')
+    setShowQuickCreate(true)
+    if (!qcMembers.length) getProjectMembers(projectId).then(setQcMembers).catch(() => {})
+  }
+
+  async function handleQuickCreate(e) {
+    e?.preventDefault()
+    if (!qcTitle.trim() || qcCreating) return
+    setQcCreating(true)
+    try {
+      await createTask({
+        projectId,
+        title: qcTitle.trim(),
+        userId: user.id,
+        status: 'todo',
+        issueType: qcType,
+        priority: qcPriority,
+        assigneeId: qcAssignee || null,
+      })
+      setShowQuickCreate(false)
+    } catch (err) {
+      alert(err.message)
+    } finally {
+      setQcCreating(false)
+    }
+  }
 
   const currentPath = location.pathname.replace(`/projects/${projectId}`, '') || ''
 
@@ -313,7 +360,7 @@ export default function ProjectLayout() {
         initial={false}
         animate={{ width: sidebarOpen ? 220 : 52 }}
         transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-        className="flex-shrink-0 bg-white border-r border-black/5 flex flex-col overflow-hidden relative z-10"
+        className="shrink-0 bg-white border-r border-black/5 flex flex-col overflow-hidden relative z-10"
       >
         {/* Header — layout flips between horizontal (open) and vertical (closed) */}
         <AnimatePresence mode="wait" initial={false}>
@@ -329,7 +376,7 @@ export default function ProjectLayout() {
               <button
                 onClick={() => navigate('/dashboard')}
                 title="Dashboard"
-                className="w-7 h-7 bg-ink rounded-lg flex items-center justify-center flex-shrink-0 hover:opacity-80 transition-opacity"
+                className="w-7 h-7 bg-ink rounded-lg flex items-center justify-center shrink-0 hover:opacity-80 transition-opacity"
               >
                 <div className="w-2.5 h-2.5 bg-violet rounded-sm" />
               </button>
@@ -340,7 +387,7 @@ export default function ProjectLayout() {
               <button
                 onClick={() => setSidebarOpen(false)}
                 title="Collapse sidebar"
-                className="flex-shrink-0 w-6 h-6 rounded-lg flex items-center justify-center text-slate-muted hover:text-ink hover:bg-paper-dim transition-colors"
+                className="shrink-0 w-6 h-6 rounded-lg flex items-center justify-center text-slate-muted hover:text-ink hover:bg-paper-dim transition-colors"
               >
                 <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
                   <path d="M8 2L4 6l4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
@@ -384,7 +431,7 @@ export default function ProjectLayout() {
             title={!sidebarOpen ? 'Search  ⌘K' : undefined}
             className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-slate-muted hover:text-ink hover:bg-paper-dim transition-colors"
           >
-            <svg width="13" height="13" viewBox="0 0 13 13" fill="none" className="flex-shrink-0">
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none" className="shrink-0">
               <circle cx="5.5" cy="5.5" r="4" stroke="currentColor" strokeWidth="1.5" />
               <path d="M9 9l2.5 2.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
             </svg>
@@ -411,7 +458,7 @@ export default function ProjectLayout() {
             title={!sidebarOpen ? (project?.name || 'Switch project') : undefined}
             className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-paper-dim transition-colors"
           >
-            <div className="w-5 h-5 bg-violet/15 rounded flex items-center justify-center flex-shrink-0">
+            <div className="w-5 h-5 bg-violet/15 rounded flex items-center justify-center shrink-0">
               <span className="font-mono text-[8px] font-bold text-violet">{projectKey.slice(0, 2)}</span>
             </div>
             <AnimatePresence>
@@ -498,7 +545,7 @@ export default function ProjectLayout() {
                         transition={{ duration: 0.15 }}
                       />
                     )}
-                    <span className="relative z-10 flex-shrink-0">
+                    <span className="relative z-10 shrink-0">
                       <item.icon />
                     </span>
                     <AnimatePresence>
@@ -528,7 +575,7 @@ export default function ProjectLayout() {
             title={!sidebarOpen ? 'All projects' : undefined}
             className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-slate-muted hover:text-ink hover:bg-paper-dim transition-colors"
           >
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="flex-shrink-0">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="shrink-0">
               <path d="M2 7h10M2 7l3.5-3.5M2 7l3.5 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
             <AnimatePresence>
@@ -551,13 +598,13 @@ export default function ProjectLayout() {
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
 
         {/* Top bar */}
-        <div className="h-11 border-b border-black/5 bg-white flex items-center px-4 gap-2 flex-shrink-0">
+        <div className="h-11 border-b border-black/5 bg-white flex items-center px-4 gap-2 shrink-0">
 
           {/* Breadcrumb */}
           <button
             onClick={() => navigate('/dashboard')}
             title="All projects"
-            className="flex-shrink-0 text-slate-muted/60 hover:text-ink transition-colors"
+            className="shrink-0 text-slate-muted/60 hover:text-ink transition-colors"
           >
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
               <rect x="1" y="1" width="5" height="5" rx="1" fill="currentColor" opacity="0.6" />
@@ -566,22 +613,34 @@ export default function ProjectLayout() {
               <rect x="8" y="8" width="5" height="5" rx="1" fill="currentColor" opacity="0.35" />
             </svg>
           </button>
-          <span className="text-slate-muted/30 text-xs flex-shrink-0">/</span>
+          <span className="text-slate-muted/30 text-xs shrink-0">/</span>
           <button
             onClick={() => navigate(`/projects/${projectId}`)}
-            className="font-medium text-ink text-sm truncate max-w-[130px] hover:text-violet transition-colors"
+            className="font-medium text-ink text-sm truncate max-w-32.5 hover:text-violet transition-colors"
           >
             {project?.name || projectKey}
           </button>
           {currentLabel && (
             <>
-              <span className="text-slate-muted/30 text-xs flex-shrink-0">/</span>
-              <span className="text-xs text-slate-muted flex-shrink-0">{currentLabel}</span>
+              <span className="text-slate-muted/30 text-xs shrink-0">/</span>
+              <span className="text-xs text-slate-muted shrink-0">{currentLabel}</span>
             </>
           )}
 
           {/* Right actions */}
           <div className="ml-auto flex items-center gap-1.5">
+
+            {/* Quick create */}
+            <motion.button
+              whileTap={{ scale: 0.93 }}
+              onClick={openQuickCreate}
+              title="Create issue  C"
+              className="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-paper-dim transition-colors text-slate-muted hover:text-ink"
+            >
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <path d="M7 1v12M1 7h12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+              </svg>
+            </motion.button>
 
             {/* Notifications bell */}
             <div ref={notifRef} className="relative">
@@ -601,7 +660,7 @@ export default function ProjectLayout() {
                       initial={{ scale: 0 }}
                       animate={{ scale: 1 }}
                       exit={{ scale: 0 }}
-                      className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 bg-violet text-white rounded-full text-[8px] flex items-center justify-center font-bold px-0.5"
+                      className="absolute -top-0.5 -right-0.5 min-w-4 h-4 bg-violet text-white rounded-full text-[8px] flex items-center justify-center font-bold px-0.5"
                     >
                       {unreadCount > 9 ? '9+' : unreadCount}
                     </motion.span>
@@ -650,6 +709,95 @@ export default function ProjectLayout() {
       {/* Keyboard shortcuts modal */}
       <AnimatePresence>
         {showKbd && <KbdShortcutsModal onClose={() => setShowKbd(false)} />}
+      </AnimatePresence>
+
+      {/* ── Quick create dialog ──────────────────────────────────── */}
+      <AnimatePresence>
+        {showQuickCreate && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/30 z-50 backdrop-blur-sm"
+              onClick={() => setShowQuickCreate(false)}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96, y: -12 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: -12 }}
+              transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+              className="fixed top-20 left-1/2 -translate-x-1/2 z-50 w-full max-w-lg"
+              onClick={e => e.stopPropagation()}
+            >
+              <form
+                onSubmit={handleQuickCreate}
+                className="bg-white rounded-2xl shadow-2xl border border-black/5 overflow-hidden"
+              >
+                {/* Type + title row */}
+                <div className="flex items-center gap-2 px-4 pt-4 pb-3">
+                  <select
+                    value={qcType}
+                    onChange={e => setQcType(e.target.value)}
+                    className="text-xs border border-black/10 rounded-lg px-2 py-1.5 bg-white shrink-0 focus:outline-none focus:ring-2 focus:ring-violet/30"
+                  >
+                    {['task','bug','story','epic','subtask'].map(t => (
+                      <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</option>
+                    ))}
+                  </select>
+                  <input
+                    autoFocus
+                    value={qcTitle}
+                    onChange={e => setQcTitle(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Escape') setShowQuickCreate(false) }}
+                    placeholder="Issue title…"
+                    className="flex-1 text-sm font-medium text-ink bg-transparent focus:outline-none placeholder:text-slate-muted/50"
+                  />
+                </div>
+
+                {/* Options row */}
+                <div className="flex items-center gap-2 px-4 pb-4 border-b border-black/5">
+                  <select
+                    value={qcPriority}
+                    onChange={e => setQcPriority(e.target.value)}
+                    className="text-xs border border-black/10 rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-violet/30"
+                  >
+                    <option value="urgent">Urgent</option>
+                    <option value="high">High</option>
+                    <option value="medium">Medium</option>
+                    <option value="low">Low</option>
+                  </select>
+                  {qcMembers.length > 0 && (
+                    <select
+                      value={qcAssignee}
+                      onChange={e => setQcAssignee(e.target.value)}
+                      className="text-xs border border-black/10 rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-violet/30"
+                    >
+                      <option value="">Unassigned</option>
+                      {qcMembers.map(m => <option key={m.id} value={m.id}>{m.full_name || m.id}</option>)}
+                    </select>
+                  )}
+                  <span className="text-[10px] text-slate-muted ml-1">will be added to backlog</span>
+                </div>
+
+                {/* Footer */}
+                <div className="flex items-center justify-between px-4 py-3">
+                  <span className="text-[10px] font-mono text-slate-muted/50">
+                    <kbd className="bg-paper-dim px-1.5 py-0.5 rounded text-[9px]">↵</kbd> create
+                    <span className="mx-2">·</span>
+                    <kbd className="bg-paper-dim px-1.5 py-0.5 rounded text-[9px]">Esc</kbd> cancel
+                  </span>
+                  <motion.button
+                    whileTap={{ scale: 0.97 }}
+                    type="submit"
+                    disabled={!qcTitle.trim() || qcCreating}
+                    className="text-xs bg-violet text-white rounded-xl px-4 py-2 font-medium hover:bg-violet/90 transition-colors disabled:opacity-40"
+                  >
+                    {qcCreating ? 'Creating…' : 'Create issue'}
+                  </motion.button>
+                </div>
+              </form>
+            </motion.div>
+          </>
+        )}
       </AnimatePresence>
     </div>
   )

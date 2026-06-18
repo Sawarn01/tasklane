@@ -68,7 +68,7 @@ export async function getTasks(projectId) {
   return data
 }
 
-export async function createTask({ projectId, title, userId, status = 'todo' }) {
+export async function createTask({ projectId, title, userId, status = 'todo', issueType, priority, assigneeId, sprintId, description }) {
   const { data: existing } = await supabase
     .from('tasks')
     .select('position')
@@ -79,9 +79,18 @@ export async function createTask({ projectId, title, userId, status = 'todo' }) 
 
   const newPosition = existing?.length ? existing[0].position + 1 : 1
 
+  const insert = {
+    project_id: projectId, title, created_by: userId, status, position: newPosition,
+    ...(issueType   && { issue_type:   issueType }),
+    ...(priority    && { priority }),
+    ...(assigneeId  && { assignee_id:  assigneeId }),
+    ...(sprintId    && { sprint_id:    sprintId }),
+    ...(description && { description }),
+  }
+
   const { data, error } = await supabase
     .from('tasks')
-    .insert({ project_id: projectId, title, created_by: userId, status, position: newPosition })
+    .insert(insert)
     .select()
     .single()
 
