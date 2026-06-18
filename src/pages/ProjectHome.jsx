@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '../lib/AuthContext'
 import {
   getProject, getProjectMembers, getTasks, getSprints,
   getProjectActivity, getProjectVersions, getProjectKey,
 } from '../lib/data'
 import { renderMarkdown } from '../components/MarkdownEditor'
+import StandupModal from '../components/StandupModal'
 
 const STATUS_META = {
   todo:        { label: 'To Do',      color: '#8A8F98', bg: '#8A8F9815' },
@@ -70,6 +71,7 @@ export default function ProjectHome() {
   const [activity, setActivity]     = useState([])
   const [versions, setVersions]     = useState([])
   const [loading, setLoading]       = useState(true)
+  const [showStandup, setShowStandup] = useState(false)
 
   useEffect(() => {
     Promise.all([
@@ -106,6 +108,43 @@ export default function ProjectHome() {
   const daysLeft = activeSprint?.end_date
     ? Math.max(0, Math.ceil((new Date(activeSprint.end_date) - new Date()) / 86400000))
     : null
+
+  // Sprint health forecast
+  const sprintHealth = (() => {
+    if (!activeSprint?.start_date || !activeSprint?.end_date) return null
+    const start        = new Date(activeSprint.start_date)
+    const end          = new Date(activeSprint.end_date)
+    const now          = new Date()
+    const totalDays    = Math.max(1, Math.ceil((end - start) / 86400000))
+    const elapsedDays  = Math.max(0, Math.ceil((now - start) / 86400000))
+    const remainDays   = Math.max(0, totalDays - elapsedDays)
+
+    const totalPts     = sprintTasks.reduce((s, t) => s + (t.story_points || 0), 0)
+    const donePts      = doneTasks.reduce((s, t) => s + (t.story_points || 0), 0)
+    const remainPts    = totalPts - donePts
+
+    if (totalPts === 0) return null // no point-estimated tasks
+
+    const ptsPerDay     = elapsedDays > 0 ? donePts / elapsedDays : 0
+    const ptsPerDayReq  = remainDays > 0  ? remainPts / remainDays : Infinity
+    const forecastDays  = ptsPerDay > 0   ? Math.ceil(remainPts / ptsPerDay) : null
+
+    // Score 0–100: ratio of actual velocity vs required velocity
+    const velocityRatio = ptsPerDayReq > 0 ? Math.min(2, ptsPerDay / ptsPerDayReq) : (elapsedDays === 0 ? 1 : 0)
+    const score         = Math.round(velocityRatio * 100)
+    const pctElapsed    = Math.min(1, elapsedDays / totalDays)
+    const pctDone       = totalPts > 0 ? donePts / totalPts : 0
+    const onTrack       = pctDone >= pctElapsed * 0.85  // within 15% tolerance
+
+    let label, accent
+    if (score >= 90)      { label = 'On track';      accent = 'sage' }
+    else if (score >= 65) { label = 'Slightly behind'; accent = 'amber' }
+    else                  { label = 'At risk';        accent = 'red' }
+
+    const daysAheadBehind = forecastDays !== null ? remainDays - forecastDays : null
+
+    return { score: Math.min(score, 100), label, accent, ptsPerDay: Math.round(ptsPerDay * 10) / 10, ptsPerDayReq: Math.round(ptsPerDayReq * 10) / 10, donePts, totalPts, forecastDays, remainDays, daysAheadBehind, onTrack }
+  })()
 
   // Stats
   const byStatus = Object.keys(STATUS_META).reduce((acc, s) => {
@@ -150,12 +189,24 @@ export default function ProjectHome() {
                 </div>
               )}
             </div>
-            <button
-              onClick={() => navigate(`/projects/${projectId}/settings`)}
-              className="text-xs text-[#8A8F98] border border-black/10 rounded-xl px-3 py-1.5 hover:bg-black/[0.03] transition-colors shrink-0"
-            >
-              Settings →
-            </button>
+            <div className="flex items-center gap-2 shrink-0">
+              <motion.button
+                whileTap={{ scale: 0.96 }}
+                onClick={() => setShowStandup(true)}
+                className="flex items-center gap-1.5 text-xs border border-violet/30 text-violet rounded-xl px-3 py-1.5 hover:bg-violet/10 transition-colors font-medium"
+              >
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                  <path d="M1 3h10M1 6h7M1 9h5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+                </svg>
+                Standup
+              </motion.button>
+              <button
+                onClick={() => navigate(`/projects/${projectId}/settings`)}
+                className="text-xs text-slate-muted border border-black/10 rounded-xl px-3 py-1.5 hover:bg-black/3 transition-colors"
+              >
+                Settings →
+              </button>
+            </div>
           </div>
 
           {/* Status cards */}
@@ -172,6 +223,67 @@ export default function ProjectHome() {
             ))}
           </div>
         </motion.div>
+
+        {/* ── Sprint Health Score ─────────────────────────────────── */}
+        {sprintHealth && (
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.06 }}
+            className={`rounded-2xl border shadow-sm p-5 ${
+              sprintHealth.accent === 'sage'  ? 'bg-sage/8 border-sage/20' :
+              sprintHealth.accent === 'amber' ? 'bg-amber-50 border-amber-200' :
+                                               'bg-red-50 border-red-200'
+            }`}
+          >
+            <div className="flex items-center gap-4 flex-wrap">
+              {/* Score ring */}
+              <div className="relative shrink-0">
+                <svg width="64" height="64" viewBox="0 0 64 64">
+                  <circle cx="32" cy="32" r="26" fill="none" stroke="rgba(0,0,0,0.06)" strokeWidth="5" />
+                  <circle
+                    cx="32" cy="32" r="26" fill="none"
+                    stroke={sprintHealth.accent === 'sage' ? '#36D399' : sprintHealth.accent === 'amber' ? '#F59E0B' : '#EF4444'}
+                    strokeWidth="5"
+                    strokeLinecap="round"
+                    strokeDasharray={`${2 * Math.PI * 26}`}
+                    strokeDashoffset={`${2 * Math.PI * 26 * (1 - sprintHealth.score / 100)}`}
+                    transform="rotate(-90 32 32)"
+                    style={{ transition: 'stroke-dashoffset 0.8s ease' }}
+                  />
+                </svg>
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                  <span className="font-bold text-sm text-ink">{sprintHealth.score}</span>
+                  <span className="font-mono text-[8px] text-slate-muted uppercase">score</span>
+                </div>
+              </div>
+
+              {/* Label + details */}
+              <div className="flex-1 min-w-0">
+                <p className="font-bold text-ink text-sm mb-0.5 flex items-center gap-2">
+                  Sprint Health
+                  <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                    sprintHealth.accent === 'sage'  ? 'bg-sage/20 text-green-700' :
+                    sprintHealth.accent === 'amber' ? 'bg-amber-100 text-amber-700' :
+                                                     'bg-red-100 text-red-700'
+                  }`}>{sprintHealth.label}</span>
+                </p>
+                <div className="flex flex-wrap gap-x-5 gap-y-1 text-xs text-slate-muted mt-1">
+                  <span><strong className="text-ink">{sprintHealth.donePts}</strong> / {sprintHealth.totalPts} pts done</span>
+                  <span>Velocity <strong className="text-ink">{sprintHealth.ptsPerDay}</strong> pts/day</span>
+                  <span>Required <strong className="text-ink">{sprintHealth.ptsPerDayReq}</strong> pts/day</span>
+                  {sprintHealth.daysAheadBehind !== null && (
+                    <span className={sprintHealth.daysAheadBehind >= 0 ? 'text-green-700' : 'text-red-600'}>
+                      {sprintHealth.daysAheadBehind >= 0
+                        ? `${sprintHealth.daysAheadBehind}d ahead of schedule`
+                        : `${Math.abs(sprintHealth.daysAheadBehind)}d behind schedule`}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
 
         <div className="grid sm:grid-cols-3 gap-5">
 
@@ -423,6 +535,13 @@ export default function ProjectHome() {
           </div>
         </div>
       </div>
+
+      {/* Standup modal */}
+      <AnimatePresence>
+        {showStandup && (
+          <StandupModal projectId={projectId} onClose={() => setShowStandup(false)} />
+        )}
+      </AnimatePresence>
     </div>
   )
 }

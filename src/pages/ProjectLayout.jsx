@@ -11,6 +11,7 @@ import { IssueTypeIcon } from '../components/IssueIcons'
 import { supabase } from '../lib/supabase'
 import GlobalSearch from '../components/GlobalSearch'
 import KbdShortcutsModal from '../components/KbdShortcutsModal'
+import { FocusModeProvider, useFocus } from '../components/FocusMode'
 import { formatTimeAgo } from '../lib/activityFormat'
 
 // ── Nav config ───────────────────────────────────────────────────
@@ -201,7 +202,7 @@ function NotifDropdown({ notifications, onSelect, onMarkAll }) {
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: i * 0.03 }}
             onClick={() => { onSelect(n.id); navigate(notifDestination(n)) }}
-            className={`w-full text-left px-4 py-3 hover:bg-paper-dim transition-colors ${!n.read ? 'bg-violet/[0.03]' : ''}`}
+            className={`w-full text-left px-4 py-3 hover:bg-paper-dim transition-colors ${!n.read ? 'bg-violet/3' : ''}`}
           >
             <div className="flex items-start gap-2.5">
               <div className={`w-1.5 h-1.5 rounded-full mt-1.5 shrink-0 ${!n.read ? 'bg-violet' : 'bg-transparent'}`} />
@@ -353,6 +354,7 @@ export default function ProjectLayout() {
   }
 
   return (
+    <FocusModeProvider>
     <div className="flex h-screen bg-paper overflow-hidden">
 
       {/* ── Sidebar ──────────────────────────────────────────────── */}
@@ -800,5 +802,6 @@ export default function ProjectLayout() {
         )}
       </AnimatePresence>
     </div>
+    </FocusModeProvider>
   )
 }

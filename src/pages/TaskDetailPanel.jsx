@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useCallback } from 'react'
+import { useEffect, useState, useRef, useCallback, useContext } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '../lib/AuthContext'
 import {
@@ -17,6 +17,7 @@ import { formatActivity, formatTimeAgo } from '../lib/activityFormat'
 import { IssueTypeIcon, PriorityIcon, StatusBadge, ISSUE_TYPES, PRIORITIES, STATUSES } from '../components/IssueIcons'
 import { useMentionState, MentionDropdown, renderWithMentions } from '../components/MentionInput'
 import { MarkdownEditor, renderMarkdown } from '../components/MarkdownEditor'
+import { useFocus } from '../components/FocusMode'
 
 const LABEL_COLORS = ['#6E56CF', '#36D399', '#F59E0B', '#EF4444', '#3B82F6', '#EC4899', '#8B5CF6']
 const LINK_TYPES = ['blocks', 'is_blocked_by', 'relates_to', 'duplicates', 'is_duplicated_by', 'clones', 'is_cloned_by']
@@ -46,6 +47,7 @@ function Chip({ children, onClick, active, color }) {
 
 export default function TaskDetailPanel({ task, members, orgPlan, projectKey, onClose, onTaskUpdated }) {
   const { user } = useAuth()
+  const focus = useFocus()
   const [tab, setTab] = useState('all') // all | comments | history
   const [comments, setComments] = useState([])
   const [newComment, setNewComment] = useState('')
@@ -394,6 +396,24 @@ export default function TaskDetailPanel({ task, members, orgPlan, projectKey, on
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M4.5 7.5l3-3M2.5 5.5l-1 1a2.12 2.12 0 000 3h0a2.12 2.12 0 003 0l1-1M7.5 6.5l1-1a2.12 2.12 0 000-3h0a2.12 2.12 0 00-3 0l-1 1" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" /></svg>
             Link
           </button>
+          {focus && (
+            <motion.button
+              whileTap={{ scale: 0.95 }}
+              onClick={() => focus.start(task)}
+              className={`flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg border transition-colors font-medium ${
+                focus.active && focus.task?.id === task.id
+                  ? 'bg-violet text-white border-violet'
+                  : 'border-violet/30 text-violet hover:bg-violet/10'
+              }`}
+              title="Start a focus session on this task"
+            >
+              <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
+                <circle cx="5.5" cy="5.5" r="4.5" stroke="currentColor" strokeWidth="1.3" />
+                <circle cx="5.5" cy="5.5" r="2" fill="currentColor" />
+              </svg>
+              {focus.active && focus.task?.id === task.id ? 'Focusing…' : 'Focus'}
+            </motion.button>
+          )}
           <button
             onClick={handleClone}
             title="Clone issue"
