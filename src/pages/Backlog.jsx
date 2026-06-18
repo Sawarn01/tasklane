@@ -6,6 +6,7 @@ import {
   getTasks, createTask, getSprints, createSprint, updateSprint,
   startSprint, completeSprint, updateTaskSprint, getProjectMembers,
   getAllTaskLabels, getProjectKey, getProject,
+  bulkUpdateTasks, bulkDeleteTasks,
 } from '../lib/data'
 import { supabase } from '../lib/supabase'
 import { IssueTypeIcon, PriorityIcon, StatusBadge } from '../components/IssueIcons'
@@ -77,7 +78,7 @@ const STATUS_BADGE = {
   completed: { label: 'Completed',  className: 'bg-sage/20 text-green-700' },
 }
 
-function IssueRow({ task, index, projectKey, onSelect, onMoveToSprint, sprints, onMoveToBacklog }) {
+function IssueRow({ task, index, projectKey, onSelect, onMoveToSprint, sprints, onMoveToBacklog, isSelected, onToggleSelect, anySelected }) {
   const [showMoveMenu, setShowMoveMenu] = useState(false)
   const isOverdue = task.due_date && task.status !== 'done' && new Date(task.due_date) < new Date()
 
@@ -87,9 +88,23 @@ function IssueRow({ task, index, projectKey, onSelect, onMoveToSprint, sprints, 
       initial={{ opacity: 0, y: -4 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -4 }}
-      className="flex items-center gap-3 px-4 py-2.5 hover:bg-paper-dim/60 border-b border-black/5 last:border-0 group cursor-pointer"
-      onClick={() => onSelect(task)}
+      className={`flex items-center gap-3 px-4 py-2.5 border-b border-black/5 last:border-0 group cursor-pointer transition-colors ${
+        isSelected ? 'bg-violet/5 hover:bg-violet/8' : 'hover:bg-paper-dim/60'
+      }`}
+      onClick={() => anySelected ? onToggleSelect(task.id) : onSelect(task)}
     >
+      {/* Checkbox */}
+      <div
+        className={`shrink-0 transition-opacity ${anySelected || isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+        onClick={e => { e.stopPropagation(); onToggleSelect(task.id) }}
+      >
+        <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center transition-colors ${
+          isSelected ? 'bg-violet border-violet' : 'border-black/20 hover:border-violet/60'
+        }`}>
+          {isSelected && <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M1 4l2 2 4-3" stroke="white" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /></svg>}
+        </div>
+      </div>
+
       <IssueTypeIcon type={task.issue_type || 'task'} size={13} />
       <span className="font-mono text-[9px] text-slate-muted/50 w-16 shrink-0">{projectKey}-{index + 1}</span>
       <span className={`flex-1 text-sm text-ink min-w-0 truncate ${task.status === 'done' ? 'line-through text-slate-muted' : ''}`}>
@@ -144,7 +159,7 @@ function IssueRow({ task, index, projectKey, onSelect, onMoveToSprint, sprints, 
   )
 }
 
-function SprintSection({ sprint, tasks, projectKey, members, onSelect, onMoveToSprint, sprints, onMoveToBacklog, onStartSprint, onCompleteSprint, onEditSprint, index }) {
+function SprintSection({ sprint, tasks, projectKey, members, onSelect, onMoveToSprint, sprints, onMoveToBacklog, onStartSprint, onCompleteSprint, onEditSprint, index, selected, onToggleSelect }) {
   const [expanded, setExpanded] = useState(sprint.status !== 'completed')
   const totalPoints = tasks.reduce((s, t) => s + (t.story_points || 0), 0)
   const donePoints = tasks.filter((t) => t.status === 'done').reduce((s, t) => s + (t.story_points || 0), 0)
@@ -229,6 +244,9 @@ function SprintSection({ sprint, tasks, projectKey, members, onSelect, onMoveToS
                     sprints={sprints}
                     onMoveToBacklog={onMoveToBacklog}
                     members={members}
+                    isSelected={selected?.has(task.id)}
+                    onToggleSelect={onToggleSelect}
+                    anySelected={selected?.size > 0}
                   />
                 ))}
               </AnimatePresence>
@@ -258,6 +276,37 @@ export default function Backlog() {
   const [filterQuery, setFilterQuery] = useState('')
   const [filterAssignee, setFilterAssignee] = useState('')
   const [filterType, setFilterType] = useState('')
+  const [filterPriority, setFilterPriority] = useState('')
+  const [selected, setSelected] = useState(new Set())
+  const [bulkWorking, setBulkWorking] = useState(false)
+
+  function toggleSelect(id) {
+    setSelected(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
+  }
+  function clearSelection() { setSelected(new Set()) }
+
+  async function bulkMoveToSprint(sprintId) {
+    if (!selected.size || bulkWorking) return
+    setBulkWorking(true)
+    try {
+      await bulkUpdateTasks([...selected], { sprint_id: sprintId || null })
+      clearSelection()
+      await loadTasks()
+    } catch (err) { alert(err.message) }
+    finally { setBulkWorking(false) }
+  }
+
+  async function bulkRemove() {
+    if (!selected.size || bulkWorking) return
+    if (!confirm(`Delete ${selected.size} issue${selected.size > 1 ? 's' : ''}?`)) return
+    setBulkWorking(true)
+    try {
+      await bulkDeleteTasks([...selected])
+      clearSelection()
+      await loadTasks()
+    } catch (err) { alert(err.message) }
+    finally { setBulkWorking(false) }
+  }
 
   useEffect(() => {
     loadAll()
@@ -348,6 +397,7 @@ export default function Backlog() {
     if (filterQuery && !task.title.toLowerCase().includes(filterQuery.toLowerCase())) return false
     if (filterAssignee && task.assignee_id !== filterAssignee) return false
     if (filterType && (task.issue_type || 'task') !== filterType) return false
+    if (filterPriority && (task.priority || 'medium') !== filterPriority) return false
     return true
   }
 
@@ -386,6 +436,18 @@ export default function Backlog() {
           <option value="bug">Bug</option>
           <option value="subtask">Subtask</option>
         </select>
+        <select value={filterPriority} onChange={(e) => setFilterPriority(e.target.value)} className="text-xs rounded-lg border border-black/10 px-2 py-1.5 bg-white">
+          <option value="">All priorities</option>
+          <option value="urgent">Urgent</option>
+          <option value="high">High</option>
+          <option value="medium">Medium</option>
+          <option value="low">Low</option>
+        </select>
+        {(filterQuery || filterAssignee || filterType || filterPriority) && (
+          <button onClick={() => { setFilterQuery(''); setFilterAssignee(''); setFilterType(''); setFilterPriority('') }} className="text-xs text-slate-muted hover:text-ink transition-colors">
+            Clear filters
+          </button>
+        )}
         <div className="ml-auto">
           <button
             onClick={() => setShowSprintModal(true)}
@@ -439,6 +501,8 @@ export default function Backlog() {
             onCompleteSprint={handleCompleteSprint}
             onEditSprint={(s) => setEditingSprint(s)}
             index={i}
+            selected={selected}
+            onToggleSelect={toggleSelect}
           />
         ))}
 
@@ -463,6 +527,9 @@ export default function Backlog() {
                   sprints={sprints}
                   onMoveToBacklog={handleMoveToBacklog}
                   members={members}
+                  isSelected={selected.has(task.id)}
+                  onToggleSelect={toggleSelect}
+                  anySelected={selected.size > 0}
                 />
               ))}
             </AnimatePresence>
@@ -517,6 +584,62 @@ export default function Backlog() {
             onClose={() => setSelectedTask(null)}
             onTaskUpdated={loadTasks}
           />
+        )}
+      </AnimatePresence>
+
+      {/* ── Bulk action bar ────────────────────────────────────── */}
+      <AnimatePresence>
+        {selected.size > 0 && (
+          <motion.div
+            initial={{ y: 80, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 80, opacity: 0 }}
+            transition={{ type: 'spring', damping: 20, stiffness: 260 }}
+            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-ink text-white rounded-2xl shadow-2xl px-4 py-3 flex items-center gap-3"
+          >
+            <span className="font-mono text-[11px] text-white/60 pr-2 border-r border-white/10">
+              {selected.size} selected
+            </span>
+
+            {/* Assign to sprint */}
+            <select
+              disabled={bulkWorking}
+              onChange={e => e.target.value && bulkMoveToSprint(e.target.value === 'backlog' ? null : e.target.value)}
+              defaultValue=""
+              className="text-xs bg-white/10 text-white rounded-lg px-2 py-1.5 border border-white/10 focus:outline-none cursor-pointer hover:bg-white/20 transition-colors disabled:opacity-50"
+            >
+              <option value="" disabled>Move to…</option>
+              <option value="backlog">→ Backlog</option>
+              {sprints.filter(s => s.status !== 'completed').map(s => (
+                <option key={s.id} value={s.id}>→ {s.name}</option>
+              ))}
+            </select>
+
+            {/* Delete */}
+            <button
+              onClick={bulkRemove}
+              disabled={bulkWorking}
+              className="text-xs text-red-400 hover:text-red-300 px-2 py-1.5 rounded-lg hover:bg-red-500/10 transition-colors disabled:opacity-50"
+            >
+              Delete
+            </button>
+
+            <div className="w-px h-4 bg-white/10" />
+
+            <button onClick={clearSelection} className="text-xs text-white/40 hover:text-white transition-colors px-1">
+              ✕ Clear
+            </button>
+
+            {bulkWorking && (
+              <motion.span
+                animate={{ opacity: [0.4, 1, 0.4] }}
+                transition={{ duration: 1, repeat: Infinity }}
+                className="text-[10px] font-mono text-white/50 ml-1"
+              >
+                Working…
+              </motion.span>
+            )}
+          </motion.div>
         )}
       </AnimatePresence>
     </div>

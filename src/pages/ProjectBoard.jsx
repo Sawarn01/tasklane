@@ -11,6 +11,7 @@ import {
   getMyOrg, getTasks, createTask, updateTaskPosition, getProjectMembers,
   getAllTaskLabels, getProjectLabels, getProjectKey,
   getSprints, completeSprint, getProjectEpics, getWipLimits,
+  updateTaskSprint, bulkUpdateTasks, bulkDeleteTasks,
 } from '../lib/data'
 import { useAuth } from '../lib/AuthContext'
 import { supabase } from '../lib/supabase'
@@ -50,10 +51,13 @@ function AssigneeAvatar({ assigneeId, members, size = 20 }) {
   )
 }
 
-function TaskCard({ task, onClick, labels, projectKey, index, members }) {
+const PRIORITY_STRIPE = { urgent: '#EF4444', high: '#F59E0B', medium: '#6E56CF', low: '#8A8F9840' }
+
+function TaskCard({ task, onClick, labels, projectKey, index, members, isSelected, onToggleSelect, anySelected }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id })
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.3 : 1 }
   const isOverdue = task.due_date && task.status !== 'done' && new Date(task.due_date) < new Date(new Date().toDateString())
+  const stripeColor = PRIORITY_STRIPE[task.priority] || PRIORITY_STRIPE.medium
 
   return (
     <motion.div
@@ -63,65 +67,79 @@ function TaskCard({ task, onClick, labels, projectKey, index, members }) {
       {...listeners}
       layout={!isDragging}
       transition={{ layout: { duration: 0.18, ease: 'easeOut' } }}
-      onClick={() => onClick(task)}
-      className={`bg-white border border-black/5 rounded-xl p-3 mb-2 shadow-sm cursor-grab active:cursor-grabbing group transition-shadow hover:shadow-md hover:border-black/10 ${
+      onClick={() => { if (anySelected) { onToggleSelect(task.id) } else { onClick(task) } }}
+      className={`bg-white border rounded-xl p-3 mb-2 shadow-sm cursor-grab active:cursor-grabbing group transition-all hover:shadow-md overflow-hidden relative ${
         isDragging ? 'shadow-xl rotate-[-1deg]' : ''
-      } ${task.status === 'done' ? 'opacity-70' : ''}`}
+      } ${task.status === 'done' ? 'opacity-70' : ''} ${
+        isSelected ? 'border-violet/50 ring-1 ring-violet/20 bg-violet/2' : 'border-black/5 hover:border-black/10'
+      }`}
     >
-      {/* Labels */}
-      {labels && labels.length > 0 && (
-        <div className="flex flex-wrap gap-1 mb-2">
-          {labels.map((label) => (
-            <span
-              key={label.id}
-              className="text-[9px] font-mono uppercase tracking-wide px-1.5 py-0.5 rounded-full font-semibold"
-              style={{ backgroundColor: `${label.color}20`, color: label.color }}
-            >
-              {label.name}
-            </span>
-          ))}
-        </div>
-      )}
-
-      {/* Title */}
+      {/* Priority stripe */}
+      <div className="absolute left-0 top-2 bottom-2 w-0.75 rounded-full" style={{ backgroundColor: stripeColor }} />
+      {/* Select checkbox — visible on hover or when something is selected */}
       <div className="flex items-start gap-2">
-        <div className="mt-0.5 flex-shrink-0">
-          <IssueTypeIcon type={task.issue_type || 'task'} size={13} />
+        <div
+          className={`mt-0.5 shrink-0 transition-opacity ${anySelected || isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+          onMouseDown={e => e.stopPropagation()}
+          onClick={e => { e.stopPropagation(); onToggleSelect(task.id, e) }}
+        >
+          <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center transition-colors ${
+            isSelected ? 'bg-violet border-violet' : 'border-black/20 hover:border-violet/60'
+          }`}>
+            {isSelected && <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M1 4l2 2 4-3" stroke="white" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /></svg>}
+          </div>
         </div>
-        <p className={`text-sm font-medium text-ink leading-snug flex-1 ${task.status === 'done' ? 'line-through text-slate-muted' : ''}`}>
-          {task.title}
-        </p>
-        {task.story_points != null && (
-          <span className="flex-shrink-0 font-mono text-[10px] bg-paper-dim text-slate-muted px-1.5 py-0.5 rounded ml-1">
-            {task.story_points}
-          </span>
-        )}
-      </div>
 
-      {/* Footer */}
-      <div className="flex items-center justify-between mt-2.5">
-        <div className="flex items-center gap-2">
-          <span className="font-mono text-[9px] text-slate-muted/50 uppercase tracking-wider">
-            {projectKey}-{index + 1}
-          </span>
-          {task.due_date && (
-            <span className={`font-mono text-[9px] uppercase tracking-wide ${isOverdue ? 'text-red-500' : 'text-slate-muted/60'}`}>
-              {isOverdue ? '⚠ ' : ''}{new Date(task.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-            </span>
+        <div className="flex-1 min-w-0">
+          {/* Labels */}
+          {labels && labels.length > 0 && (
+            <div className="flex flex-wrap gap-1 mb-1.5">
+              {labels.map((label) => (
+                <span key={label.id}
+                  className="text-[9px] font-mono uppercase tracking-wide px-1.5 py-0.5 rounded-full font-semibold"
+                  style={{ backgroundColor: `${label.color}20`, color: label.color }}
+                >{label.name}</span>
+              ))}
+            </div>
           )}
-        </div>
-        <div className="flex items-center gap-1.5">
-          <PriorityIcon priority={task.priority || 'medium'} size={11} />
-          {task.assignee_id && (
-            <AssigneeAvatar assigneeId={task.assignee_id} members={members} size={20} />
-          )}
+
+          {/* Title row */}
+          <div className="flex items-start gap-2">
+            <IssueTypeIcon type={task.issue_type || 'task'} size={13} />
+            <p className={`text-sm font-medium text-ink leading-snug flex-1 ${task.status === 'done' ? 'line-through text-slate-muted' : ''}`}>
+              {task.title}
+            </p>
+            {task.story_points != null && (
+              <span className="shrink-0 font-mono text-[10px] bg-paper-dim text-slate-muted px-1.5 py-0.5 rounded ml-1">
+                {task.story_points}
+              </span>
+            )}
+          </div>
+
+          {/* Footer */}
+          <div className="flex items-center justify-between mt-2.5">
+            <div className="flex items-center gap-2">
+              <span className="font-mono text-[9px] text-slate-muted/50 uppercase tracking-wider">
+                {projectKey}-{index + 1}
+              </span>
+              {task.due_date && (
+                <span className={`font-mono text-[9px] uppercase tracking-wide ${isOverdue ? 'text-red-500' : 'text-slate-muted/60'}`}>
+                  {isOverdue ? '⚠ ' : ''}{new Date(task.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-1.5">
+              <PriorityIcon priority={task.priority || 'medium'} size={11} />
+              {task.assignee_id && <AssigneeAvatar assigneeId={task.assignee_id} members={members} size={20} />}
+            </div>
+          </div>
         </div>
       </div>
     </motion.div>
   )
 }
 
-function Column({ column, tasks, onTaskClick, taskLabels, projectKey, members, onQuickAdd, collapsed, onToggleCollapse, wipLimit }) {
+function Column({ column, tasks, onTaskClick, taskLabels, projectKey, members, onQuickAdd, collapsed, onToggleCollapse, wipLimit, selected, onToggleSelect }) {
   const { setNodeRef } = useDroppable({ id: column.key })
   const overWip = wipLimit && tasks.length > wipLimit
 
@@ -198,6 +216,9 @@ function Column({ column, tasks, onTaskClick, taskLabels, projectKey, members, o
                   projectKey={projectKey}
                   index={i}
                   members={members}
+                  isSelected={selected?.has(task.id)}
+                  onToggleSelect={onToggleSelect}
+                  anySelected={selected?.size > 0}
                 />
               ))}
             </AnimatePresence>
@@ -213,7 +234,7 @@ function Column({ column, tasks, onTaskClick, taskLabels, projectKey, members, o
 const PRIORITY_ORDER = ['urgent', 'high', 'medium', 'low']
 const PRIORITY_ACCENTS = { urgent: '#EF4444', high: '#F59E0B', medium: '#6E56CF', low: '#8A8F98' }
 
-function SwimLaneRow({ label, color, tasks, column, onTaskClick, taskLabels, projectKey, members }) {
+function SwimLaneRow({ label, color, tasks, column, onTaskClick, taskLabels, projectKey, members, selected, onToggleSelect }) {
   const [collapsed, setCollapsed] = useState(false)
   const { setNodeRef } = useDroppable({ id: `${column.key}__${label}` })
 
@@ -259,6 +280,9 @@ function SwimLaneRow({ label, color, tasks, column, onTaskClick, taskLabels, pro
                     projectKey={projectKey}
                     index={i}
                     members={members}
+                    isSelected={selected?.has(task.id)}
+                    onToggleSelect={onToggleSelect}
+                    anySelected={selected?.size > 0}
                   />
                 ))}
               </AnimatePresence>
@@ -307,6 +331,12 @@ export default function ProjectBoard() {
   const [filterMine, setFilterMine]     = useState(false)
   const [filterUnassigned, setFilterUnassigned] = useState(false)
   const [completingSprint, setCompletingSprint] = useState(false)
+  const [boardSearch, setBoardSearch]   = useState('')
+  const [selected, setSelected]         = useState(new Set()) // selected task IDs for bulk ops
+  const [bulkWorking, setBulkWorking]   = useState(false)
+  const [showCompleteModal, setShowCompleteModal] = useState(false)
+  const [incompleteDisposition, setIncompleteDisposition] = useState({}) // taskId → 'backlog' | sprintId
+  const [allSprints, setAllSprints]     = useState([])
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
 
@@ -316,7 +346,10 @@ export default function ProjectBoard() {
     getMyOrg().then(({ org }) => setOrgPlan(org.plan)).catch(() => {})
     getAllTaskLabels(projectId).then(setTaskLabels).catch(() => {})
     getProjectLabels(projectId).then(setProjectLabels).catch(() => {})
-    getSprints(projectId).then((sprints) => setActiveSprint(sprints.find((s) => s.status === 'active') || null)).catch(() => {})
+    getSprints(projectId).then((sprints) => {
+      setAllSprints(sprints)
+      setActiveSprint(sprints.find((s) => s.status === 'active') || null)
+    }).catch(() => {})
     getProjectEpics(projectId).then(setEpics).catch(() => {})
     getWipLimits(projectId).then(setWipLimits).catch(() => {})
     import('../lib/data').then(({ getProject }) => getProject(projectId).then(setProject).catch(() => {}))
@@ -412,12 +445,30 @@ export default function ProjectBoard() {
     }
   }
 
+  // Opens the sprint completion modal and initialises default disposition (backlog)
+  function openCompleteModal() {
+    if (!activeSprint) return
+    const incomplete = tasks.filter(t => t.sprint_id === activeSprint.id && t.status !== 'done')
+    const defaults = {}
+    incomplete.forEach(t => { defaults[t.id] = 'backlog' })
+    setIncompleteDisposition(defaults)
+    setShowCompleteModal(true)
+  }
+
   async function handleCompleteSprint() {
     if (!activeSprint || completingSprint) return
     setCompletingSprint(true)
     try {
+      // Move incomplete issues per user choice
+      const incomplete = tasks.filter(t => t.sprint_id === activeSprint.id && t.status !== 'done')
+      for (const task of incomplete) {
+        const dest = incompleteDisposition[task.id]
+        await updateTaskSprint({ taskId: task.id, sprintId: dest === 'backlog' ? null : dest })
+      }
       await completeSprint(activeSprint.id)
       setActiveSprint(null)
+      setShowCompleteModal(false)
+      await loadBoard()
     } catch (err) {
       setError(err.message)
     } finally {
@@ -425,7 +476,49 @@ export default function ProjectBoard() {
     }
   }
 
+  // ── Bulk selection helpers ──────────────────────────────────────
+  function toggleSelect(taskId, e) {
+    e.stopPropagation()
+    setSelected(prev => {
+      const next = new Set(prev)
+      next.has(taskId) ? next.delete(taskId) : next.add(taskId)
+      return next
+    })
+  }
+
+  function clearSelection() { setSelected(new Set()) }
+
+  async function bulkAction(patch) {
+    if (!selected.size || bulkWorking) return
+    setBulkWorking(true)
+    try {
+      await bulkUpdateTasks([...selected], patch)
+      clearSelection()
+      await loadBoard()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setBulkWorking(false)
+    }
+  }
+
+  async function bulkDelete() {
+    if (!selected.size || bulkWorking) return
+    if (!confirm(`Delete ${selected.size} issue${selected.size > 1 ? 's' : ''}? This cannot be undone.`)) return
+    setBulkWorking(true)
+    try {
+      await bulkDeleteTasks([...selected])
+      clearSelection()
+      await loadBoard()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setBulkWorking(false)
+    }
+  }
+
   function matchesFilters(task) {
+    if (boardSearch && !task.title.toLowerCase().includes(boardSearch.toLowerCase())) return false
     if (filterMine && task.assignee_id !== user.id) return false
     if (filterUnassigned && task.assignee_id) return false
     if (filterAssignee && task.assignee_id !== filterAssignee) return false
@@ -510,6 +603,23 @@ export default function ProjectBoard() {
 
       {/* ── Toolbar ────────────────────────────────────────────── */}
       <div className="px-5 py-3 border-b border-black/5 bg-white flex items-center gap-3 flex-shrink-0 flex-wrap">
+        {/* Board search */}
+        <div className="relative">
+          <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-muted pointer-events-none" width="11" height="11" viewBox="0 0 12 12" fill="none">
+            <circle cx="5" cy="5" r="4" stroke="currentColor" strokeWidth="1.3" />
+            <path d="M8.5 8.5l2 2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+          </svg>
+          <input
+            value={boardSearch}
+            onChange={e => setBoardSearch(e.target.value)}
+            placeholder="Search board…"
+            className="text-xs pl-7 pr-3 py-1.5 rounded-lg border border-black/10 bg-white focus:outline-none focus:ring-2 focus:ring-violet/30 w-40 placeholder:text-slate-muted/60"
+          />
+          {boardSearch && (
+            <button onClick={() => setBoardSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-muted hover:text-ink text-xs">✕</button>
+          )}
+        </div>
+
         {/* Filters button */}
         <button
           onClick={() => setShowFilters(!showFilters)}
@@ -712,11 +822,11 @@ export default function ProjectBoard() {
             {/* Complete sprint */}
             <motion.button
               whileTap={{ scale: 0.96 }}
-              onClick={handleCompleteSprint}
+              onClick={openCompleteModal}
               disabled={completingSprint}
               className="shrink-0 text-xs px-3 py-1.5 rounded-xl bg-sage/15 text-sage hover:bg-sage/25 transition-colors disabled:opacity-50 font-medium"
             >
-              {completingSprint ? 'Completing…' : 'Complete Sprint'}
+              Complete Sprint
             </motion.button>
           </motion.div>
         )}
@@ -780,6 +890,8 @@ export default function ProjectBoard() {
                           taskLabels={taskLabels}
                           projectKey={projectKey}
                           members={members}
+                          selected={selected}
+                          onToggleSelect={toggleSelect}
                         />
                       ))}
                     </div>
@@ -796,6 +908,8 @@ export default function ProjectBoard() {
                       collapsed={isCollapsed}
                       onToggleCollapse={() => toggleColCollapse(column.key)}
                       wipLimit={wipLimits[column.key] || null}
+                      selected={selected}
+                      onToggleSelect={toggleSelect}
                     />
                   )}
 
@@ -925,6 +1039,187 @@ export default function ProjectBoard() {
             onClose={() => setSelectedTask(null)}
             onTaskUpdated={loadBoard}
           />
+        )}
+      </AnimatePresence>
+
+      {/* ── Bulk action bar ────────────────────────────────────── */}
+      <AnimatePresence>
+        {selected.size > 0 && (
+          <motion.div
+            initial={{ y: 80, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 80, opacity: 0 }}
+            transition={{ type: 'spring', damping: 20, stiffness: 260 }}
+            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-ink text-white rounded-2xl shadow-2xl px-4 py-3 flex items-center gap-3"
+          >
+            <span className="font-mono text-[11px] text-white/60 pr-2 border-r border-white/10">
+              {selected.size} selected
+            </span>
+
+            {/* Status */}
+            <select
+              disabled={bulkWorking}
+              onChange={e => e.target.value && bulkAction({ status: e.target.value })}
+              defaultValue=""
+              className="text-xs bg-white/10 text-white rounded-lg px-2 py-1.5 border border-white/10 focus:outline-none cursor-pointer hover:bg-white/20 transition-colors disabled:opacity-50"
+            >
+              <option value="" disabled>Set status…</option>
+              {COLUMNS.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}
+            </select>
+
+            {/* Assignee */}
+            <select
+              disabled={bulkWorking}
+              onChange={e => bulkAction({ assignee_id: e.target.value || null })}
+              defaultValue=""
+              className="text-xs bg-white/10 text-white rounded-lg px-2 py-1.5 border border-white/10 focus:outline-none cursor-pointer hover:bg-white/20 transition-colors disabled:opacity-50"
+            >
+              <option value="" disabled>Assign to…</option>
+              <option value="">Unassign</option>
+              {members.map(m => <option key={m.id} value={m.id}>{m.full_name || 'Unknown'}</option>)}
+            </select>
+
+            {/* Priority */}
+            <select
+              disabled={bulkWorking}
+              onChange={e => e.target.value && bulkAction({ priority: e.target.value })}
+              defaultValue=""
+              className="text-xs bg-white/10 text-white rounded-lg px-2 py-1.5 border border-white/10 focus:outline-none cursor-pointer hover:bg-white/20 transition-colors disabled:opacity-50"
+            >
+              <option value="" disabled>Set priority…</option>
+              <option value="urgent">Urgent</option>
+              <option value="high">High</option>
+              <option value="medium">Medium</option>
+              <option value="low">Low</option>
+            </select>
+
+            {/* Delete */}
+            <button
+              onClick={bulkDelete}
+              disabled={bulkWorking}
+              className="text-xs text-red-400 hover:text-red-300 px-2 py-1.5 rounded-lg hover:bg-red-500/10 transition-colors disabled:opacity-50"
+            >
+              Delete
+            </button>
+
+            <div className="w-px h-4 bg-white/10" />
+
+            <button onClick={clearSelection} className="text-xs text-white/40 hover:text-white transition-colors px-1">
+              ✕ Clear
+            </button>
+
+            {bulkWorking && (
+              <motion.span
+                animate={{ opacity: [0.4, 1, 0.4] }}
+                transition={{ duration: 1, repeat: Infinity }}
+                className="text-[10px] font-mono text-white/50 ml-1"
+              >
+                Updating…
+              </motion.span>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Sprint completion modal ────────────────────────────── */}
+      <AnimatePresence>
+        {showCompleteModal && activeSprint && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/40 z-50 backdrop-blur-sm"
+              onClick={() => !completingSprint && setShowCompleteModal(false)}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 12 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 12 }}
+              transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+              className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none"
+            >
+              <div className="bg-white rounded-2xl shadow-2xl border border-black/5 w-full max-w-md pointer-events-auto">
+                {/* Header */}
+                <div className="px-6 pt-6 pb-4 border-b border-black/5">
+                  <h2 className="text-base font-bold text-ink">Complete Sprint</h2>
+                  <p className="text-xs text-slate-muted mt-0.5">{activeSprint.name}</p>
+                </div>
+
+                {/* Stats */}
+                {(() => {
+                  const sprintTasks = tasks.filter(t => t.sprint_id === activeSprint.id)
+                  const done = sprintTasks.filter(t => t.status === 'done')
+                  const incomplete = sprintTasks.filter(t => t.status !== 'done')
+                  const nextSprints = allSprints.filter(s => s.status === 'planning' && s.id !== activeSprint.id)
+
+                  return (
+                    <div className="px-6 py-4 space-y-4">
+                      {/* Summary row */}
+                      <div className="flex gap-3">
+                        <div className="flex-1 bg-sage/10 rounded-xl px-4 py-3 text-center">
+                          <p className="text-2xl font-bold text-sage">{done.length}</p>
+                          <p className="text-[10px] font-mono uppercase tracking-wider text-sage/70 mt-0.5">Completed</p>
+                        </div>
+                        <div className="flex-1 bg-amber-50 rounded-xl px-4 py-3 text-center">
+                          <p className="text-2xl font-bold text-amber-500">{incomplete.length}</p>
+                          <p className="text-[10px] font-mono uppercase tracking-wider text-amber-500/70 mt-0.5">Incomplete</p>
+                        </div>
+                      </div>
+
+                      {/* Incomplete issue list */}
+                      {incomplete.length > 0 && (
+                        <div>
+                          <p className="text-xs font-semibold text-ink mb-2">Where should incomplete issues go?</p>
+                          <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                            {incomplete.map(task => (
+                              <div key={task.id} className="flex items-center gap-3 bg-paper-dim rounded-xl px-3 py-2.5">
+                                <IssueTypeIcon type={task.issue_type || 'task'} size={13} />
+                                <span className="text-xs text-ink flex-1 truncate">{task.title}</span>
+                                <select
+                                  value={incompleteDisposition[task.id] || 'backlog'}
+                                  onChange={e => setIncompleteDisposition(prev => ({ ...prev, [task.id]: e.target.value }))}
+                                  className="text-[10px] border border-black/10 rounded-lg px-1.5 py-1 bg-white shrink-0 focus:outline-none focus:ring-1 focus:ring-violet/30"
+                                >
+                                  <option value="backlog">→ Backlog</option>
+                                  {nextSprints.map(s => (
+                                    <option key={s.id} value={s.id}>→ {s.name}</option>
+                                  ))}
+                                </select>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {incomplete.length === 0 && (
+                        <p className="text-sm text-sage font-medium text-center py-2">
+                          All {done.length} issues are done.
+                        </p>
+                      )}
+                    </div>
+                  )
+                })()}
+
+                {/* Actions */}
+                <div className="px-6 pb-6 flex gap-3">
+                  <button
+                    onClick={() => setShowCompleteModal(false)}
+                    disabled={completingSprint}
+                    className="flex-1 text-sm border border-black/10 rounded-xl py-2.5 text-slate-muted hover:text-ink hover:border-black/20 transition-colors disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <motion.button
+                    whileTap={{ scale: 0.97 }}
+                    onClick={handleCompleteSprint}
+                    disabled={completingSprint}
+                    className="flex-1 text-sm bg-sage text-white rounded-xl py-2.5 font-medium hover:bg-sage/90 transition-colors disabled:opacity-50"
+                  >
+                    {completingSprint ? 'Completing…' : 'Complete Sprint'}
+                  </motion.button>
+                </div>
+              </div>
+            </motion.div>
+          </>
         )}
       </AnimatePresence>
     </div>

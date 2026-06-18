@@ -933,6 +933,16 @@ export async function getMyAssignedTasks(userId) {
   return data
 }
 
+export async function getMyAllTasks(userId) {
+  const { data, error } = await supabase
+    .from('tasks')
+    .select('id, title, status, priority, issue_type, story_points, due_date, updated_at, project_id, projects(id, name)')
+    .eq('assignee_id', userId)
+    .order('updated_at', { ascending: false })
+  if (error) throw error
+  return data
+}
+
 export async function getMyOrgActivity() {
   const { data, error } = await supabase
     .from('activity_log')
@@ -999,6 +1009,23 @@ export async function updateTaskEstimate({ taskId, minutes }) {
     .from('tasks')
     .update({ original_estimate: minutes || null, updated_at: new Date().toISOString() })
     .eq('id', taskId)
+  if (error) throw error
+}
+
+// ==================== BULK OPERATIONS ====================
+
+export async function bulkUpdateTasks(taskIds, patch) {
+  if (!taskIds.length) return
+  const { error } = await supabase
+    .from('tasks')
+    .update({ ...patch, updated_at: new Date().toISOString() })
+    .in('id', taskIds)
+  if (error) throw error
+}
+
+export async function bulkDeleteTasks(taskIds) {
+  if (!taskIds.length) return
+  const { error } = await supabase.from('tasks').delete().in('id', taskIds)
   if (error) throw error
 }
 

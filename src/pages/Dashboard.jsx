@@ -835,7 +835,15 @@ export default function Dashboard() {
             >
               <div className="flex items-center justify-between px-5 py-4 border-b border-black/5">
                 <p className="font-semibold text-sm text-ink">My open tasks</p>
-                <span className="font-mono text-[10px] text-slate-muted uppercase tracking-wide">{myTasks.length} issues</span>
+                <div className="flex items-center gap-3">
+                  <span className="font-mono text-[10px] text-slate-muted uppercase tracking-wide">{myTasks.length} issues</span>
+                  <button
+                    onClick={() => navigate('/my-work')}
+                    className="text-[10px] text-violet hover:text-violet/70 font-medium transition-colors"
+                  >
+                    View all →
+                  </button>
+                </div>
               </div>
               <div className="divide-y divide-black/5">
                 {myTasks.length === 0 && (
