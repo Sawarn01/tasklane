@@ -1049,3 +1049,170 @@ export async function getProjectOverview(projectId) {
   ])
   return { tasks, sprints, members, activity: activity.slice(0, 15) }
 }
+
+// ── Meetings ────────────────────────────────────────────────────
+export async function getMeetings(projectId) {
+  const { data, error } = await supabase
+    .from('meetings')
+    .select('*, meeting_action_items(id, done)')
+    .eq('project_id', projectId)
+    .order('date', { ascending: false })
+  if (error) return []
+  return data
+}
+
+export async function getMeeting(meetingId) {
+  const { data, error } = await supabase
+    .from('meetings')
+    .select('*')
+    .eq('id', meetingId)
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function createMeeting({ projectId, title, date, agenda, attendeeIds = [], userId }) {
+  const { data, error } = await supabase
+    .from('meetings')
+    .insert({ project_id: projectId, title, date, agenda, attendee_ids: attendeeIds, created_by: userId, notes: '', decisions: '' })
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function updateMeeting({ meetingId, title, date, agenda, notes, decisions }) {
+  const patch = {}
+  if (title     !== undefined) patch.title     = title
+  if (date      !== undefined) patch.date      = date
+  if (agenda    !== undefined) patch.agenda    = agenda
+  if (notes     !== undefined) patch.notes     = notes
+  if (decisions !== undefined) patch.decisions = decisions
+  const { data, error } = await supabase
+    .from('meetings')
+    .update({ ...patch, updated_at: new Date().toISOString() })
+    .eq('id', meetingId)
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function deleteMeeting(meetingId) {
+  const { error } = await supabase.from('meetings').delete().eq('id', meetingId)
+  if (error) throw error
+}
+
+export async function getMeetingActionItems(meetingId) {
+  const { data, error } = await supabase
+    .from('meeting_action_items')
+    .select('*, profiles!meeting_action_items_assignee_id_fkey(full_name)')
+    .eq('meeting_id', meetingId)
+    .order('created_at', { ascending: true })
+  if (error) return []
+  return data
+}
+
+export async function createActionItem({ meetingId, projectId, title, assigneeId, userId }) {
+  const { data, error } = await supabase
+    .from('meeting_action_items')
+    .insert({ meeting_id: meetingId, project_id: projectId, title, assignee_id: assigneeId || null, created_by: userId, done: false })
+    .select('*, profiles!meeting_action_items_assignee_id_fkey(full_name)')
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function toggleActionItem({ itemId, done }) {
+  const { error } = await supabase
+    .from('meeting_action_items')
+    .update({ done })
+    .eq('id', itemId)
+  if (error) throw error
+}
+
+export async function actionItemToTask({ item, projectId, userId }) {
+  const task = await createTask({
+    projectId,
+    title: item.title,
+    userId,
+    status: 'todo',
+    assigneeId: item.assignee_id,
+  })
+  await supabase
+    .from('meeting_action_items')
+    .update({ task_id: task.id })
+    .eq('id', item.id)
+  return task
+}
+
+// ── Team Pulse ──────────────────────────────────────────────────
+export async function submitPulse({ userId, projectId, score }) {
+  const today = new Date().toISOString().slice(0, 10)
+  const { error } = await supabase
+    .from('team_pulse')
+    .upsert({ user_id: userId, project_id: projectId, score, date: today }, { onConflict: 'user_id,project_id,date' })
+  if (error) throw error
+}
+
+export async function getProjectPulse(projectId) {
+  const since = new Date(Date.now() - 14 * 86400000).toISOString().slice(0, 10)
+  const { data, error } = await supabase
+    .from('team_pulse')
+    .select('score, date')
+    .eq('project_id', projectId)
+    .gte('date', since)
+    .order('date', { ascending: true })
+  if (error) return []
+  return data
+}
+
+export async function getTodaysPulse({ userId, projectId }) {
+  const today = new Date().toISOString().slice(0, 10)
+  const { data } = await supabase
+    .from('team_pulse')
+    .select('score')
+    .eq('user_id', userId)
+    .eq('project_id', projectId)
+    .eq('date', today)
+    .single()
+  return data?.score ?? null
+}
+
+// ── Subtasks (parent_task_id relationship) ──────────────────────
+export async function getSubtasks(parentTaskId) {
+  const { data, error } = await supabase
+    .from('tasks')
+    .select('*')
+    .eq('parent_task_id', parentTaskId)
+    .order('created_at', { ascending: true })
+  if (error) return []
+  return data
+}
+
+export async function createSubtask({ parentTaskId, projectId, title, userId, assigneeId }) {
+  const { data: existing } = await supabase
+    .from('tasks')
+    .select('position')
+    .eq('project_id', projectId)
+    .eq('status', 'todo')
+    .order('position', { ascending: false })
+    .limit(1)
+  const newPosition = existing?.length ? existing[0].position + 1 : 1
+  const { data, error } = await supabase
+    .from('tasks')
+    .insert({
+      project_id: projectId,
+      parent_task_id: parentTaskId,
+      title,
+      created_by: userId,
+      status: 'todo',
+      issue_type: 'subtask',
+      position: newPosition,
+      ...(assigneeId && { assignee_id: assigneeId }),
+    })
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}

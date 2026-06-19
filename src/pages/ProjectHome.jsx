@@ -8,6 +8,7 @@ import {
 } from '../lib/data'
 import { renderMarkdown } from '../components/MarkdownEditor'
 import StandupModal from '../components/StandupModal'
+import TeamPulse from '../components/TeamPulse'
 
 const STATUS_META = {
   todo:        { label: 'To Do',      color: '#8A8F98', bg: '#8A8F9815' },
@@ -506,6 +507,11 @@ export default function ProjectHome() {
               </motion.div>
             )}
 
+            {/* Team Pulse */}
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.12 }}>
+              <TeamPulse projectId={projectId} />
+            </motion.div>
+
             {/* Quick actions */}
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}
               className="bg-white rounded-2xl border border-black/5 shadow-sm p-5"
@@ -517,6 +523,7 @@ export default function ProjectHome() {
                   { label: 'Backlog', sub: `${(byStatus.todo || 0)} unstarted`, path: '/backlog' },
                   { label: 'Timeline', sub: 'Roadmap view', path: '/timeline' },
                   { label: 'Reports', sub: 'Velocity & burndown', path: '/reports' },
+                  { label: 'Meetings', sub: 'Notes & action items', path: '/meetings' },
                   { label: 'Chat', sub: 'Team conversation', path: '/chat' },
                 ].map(item => (
                   <button key={item.path}

@@ -34,6 +34,7 @@ const NAV_ITEMS = [
     group: 'Collaborate',
     items: [
       { key: 'chat',     label: 'Chat',     path: '/chat',     icon: ChatIcon },
+      { key: 'meetings', label: 'Meetings', path: '/meetings', icon: MeetingsIcon },
       { key: 'activity', label: 'Activity', path: '/activity', icon: ActivityIcon },
       { key: 'members',  label: 'Members',  path: '/members',  icon: MembersIcon },
     ],
@@ -138,6 +139,17 @@ function SettingsIcon() {
     <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
       <circle cx="7" cy="7" r="2" stroke="currentColor" strokeWidth="1.5" fill="none" />
       <path d="M7 1v1.5M7 11.5V13M1 7h1.5M11.5 7H13M2.93 2.93l1.06 1.06M10.01 10.01l1.06 1.06M11.07 2.93l-1.06 1.06M3.99 10.01l-1.06 1.06" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" opacity="0.7" />
+    </svg>
+  )
+}
+function MeetingsIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+      <rect x="1" y="3" width="12" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.2" fill="none" opacity="0.8" />
+      <path d="M5 1v3M9 1v3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" opacity="0.6" />
+      <circle cx="4" cy="9" r="0.9" fill="currentColor" opacity="0.6" />
+      <circle cx="7" cy="9" r="0.9" fill="currentColor" opacity="0.6" />
+      <circle cx="10" cy="9" r="0.9" fill="currentColor" opacity="0.6" />
     </svg>
   )
 }

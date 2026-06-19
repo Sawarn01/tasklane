@@ -20,6 +20,7 @@ import ProjectHome from './pages/ProjectHome'
 import ProjectMembers from './pages/ProjectMembers'
 import MyWork from './pages/MyWork'
 import Notifications from './pages/Notifications'
+import Meetings from './pages/Meetings'
 
 function PrivateRoute({ children }) {
   const { user, loading } = useAuth()
@@ -65,6 +66,7 @@ function App() {
           <Route path="releases" element={<Releases />} />
           <Route path="settings" element={<ProjectSettings />} />
           <Route path="chat"     element={<ProjectChat />} />
+          <Route path="meetings" element={<Meetings />} />
           <Route path="activity" element={<ProjectActivity />} />
         </Route>
       </Routes>

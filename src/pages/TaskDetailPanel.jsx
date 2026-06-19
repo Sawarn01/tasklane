@@ -18,6 +18,7 @@ import { IssueTypeIcon, PriorityIcon, StatusBadge, ISSUE_TYPES, PRIORITIES, STAT
 import { useMentionState, MentionDropdown, renderWithMentions } from '../components/MentionInput'
 import { MarkdownEditor, renderMarkdown } from '../components/MarkdownEditor'
 import { useFocus } from '../components/FocusMode'
+import BreakdownModal from '../components/BreakdownModal'
 
 const LABEL_COLORS = ['#6E56CF', '#36D399', '#F59E0B', '#EF4444', '#3B82F6', '#EC4899', '#8B5CF6']
 const LINK_TYPES = ['blocks', 'is_blocked_by', 'relates_to', 'duplicates', 'is_duplicated_by', 'clones', 'is_cloned_by']
@@ -82,7 +83,8 @@ export default function TaskDetailPanel({ task, members, orgPlan, projectKey, on
   const [watchers, setWatchers] = useState([])
   const [isWatching, setIsWatching] = useState(false)
   const [timeLogs, setTimeLogs] = useState([])
-  const [showTimeModal, setShowTimeModal] = useState(false)
+  const [showTimeModal, setShowTimeModal]     = useState(false)
+  const [showBreakdown, setShowBreakdown]     = useState(false)
   const [logMinutes, setLogMinutes] = useState('')
   const [logDesc, setLogDesc] = useState('')
   const [estimate, setEstimate] = useState(task.original_estimate ? String(Math.round(task.original_estimate / 60 * 10) / 10) : '')
@@ -414,6 +416,16 @@ export default function TaskDetailPanel({ task, members, orgPlan, projectKey, on
               {focus.active && focus.task?.id === task.id ? 'Focusing…' : 'Focus'}
             </motion.button>
           )}
+          <button
+            onClick={() => setShowBreakdown(true)}
+            title="Break down into subtasks"
+            className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg border border-black/10 text-slate-muted hover:text-ink transition-colors"
+          >
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <path d="M2 2h8M4 5.5h6M6 9h4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+            </svg>
+            Breakdown
+          </button>
           <button
             onClick={handleClone}
             title="Clone issue"
@@ -966,6 +978,18 @@ export default function TaskDetailPanel({ task, members, orgPlan, projectKey, on
               </form>
             </motion.div>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Breakdown modal */}
+      <AnimatePresence>
+        {showBreakdown && (
+          <BreakdownModal
+            task={task}
+            projectId={task.project_id}
+            onClose={() => setShowBreakdown(false)}
+            onCreated={() => {}}
+          />
         )}
       </AnimatePresence>
     </motion.div>
