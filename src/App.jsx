@@ -22,6 +22,7 @@ import MyWork from './pages/MyWork'
 import Notifications from './pages/Notifications'
 import Meetings from './pages/Meetings'
 import MeetingRoom from './pages/MeetingRoom'
+import Onboarding from './pages/Onboarding'
 
 function PrivateRoute({ children }) {
   const { user, loading } = useAuth()
@@ -46,6 +47,7 @@ function App() {
         <Route path="/" element={<LandingPage />} />
         <Route path="/signup" element={<SignUp />} />
         <Route path="/login" element={<Login />} />
+        <Route path="/onboarding" element={<PrivateRoute><Onboarding /></PrivateRoute>} />
 
         {/* Full-screen meeting room — outside ProjectLayout */}
         <Route

@@ -28,7 +28,7 @@ export default function SignUp() {
       } else {
         await signUpAndJoinOrg({ email, password, fullName, inviteToken: inviteToken.trim() })
       }
-      navigate('/dashboard')
+      navigate(`/onboarding?mode=${mode}`)
     } catch (err) {
       setError(err.message)
     } finally {
