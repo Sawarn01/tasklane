@@ -117,13 +117,14 @@ function VideoTile({ stream, displayName, muted = false, local = false, videoEna
       }`}
       style={{ aspectRatio: '16/9' }}
     >
-      {/* Video element */}
+      {/* Video element — local feed is mirrored (natural mirror feel) */}
       <video
         ref={videoRef}
         autoPlay
         playsInline
         muted={muted}
         className={`w-full h-full object-cover transition-opacity ${showVideo ? 'opacity-100' : 'opacity-0 absolute'}`}
+        style={local ? { transform: 'scaleX(-1)' } : undefined}
       />
 
       {/* Avatar (shown when video off or no stream) */}
@@ -175,14 +176,17 @@ function RoomChat({ meetingId, userId, displayName }) {
   const channelRef = useRef(null)
 
   useEffect(() => {
+    // self: false — sender does NOT receive their own broadcast echo.
+    // We add the sender's message to state immediately on send() instead,
+    // so there's zero delay for the person who typed it.
     const ch = supabase.channel(`meeting-chat-${meetingId}`, {
-      config: { broadcast: { self: true } },
+      config: { broadcast: { self: false, ack: false } },
     })
     channelRef.current = ch
 
     ch.on('broadcast', { event: 'chat' }, ({ payload }) => {
       setMessages(prev => [...prev, payload])
-      setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
+      setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 40)
     }).subscribe()
 
     return () => { supabase.removeChannel(ch) }
@@ -190,11 +194,12 @@ function RoomChat({ meetingId, userId, displayName }) {
 
   function send() {
     if (!draft.trim()) return
-    channelRef.current?.send({
-      type: 'broadcast',
-      event: 'chat',
-      payload: { userId, displayName, body: draft.trim(), ts: Date.now() },
-    })
+    const msg = { userId, displayName, body: draft.trim(), ts: Date.now() }
+    // Show immediately for the sender — no round-trip wait
+    setMessages(prev => [...prev, msg])
+    setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 40)
+    // Broadcast to everyone else in the room
+    channelRef.current?.send({ type: 'broadcast', event: 'chat', payload: msg })
     setDraft('')
   }
 
