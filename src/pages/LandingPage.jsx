@@ -3,10 +3,10 @@ import { Link } from 'react-router-dom'
 import { motion, AnimatePresence, useInView, useMotionValue, useSpring } from 'framer-motion'
 
 // ─── Design tokens ─────────────────────────────────────────────────────────
-const V = '#6E56CF'      // violet
-const INK = '#0F1115'    // ink
-const MUTED = '#8A8F98'  // slate-muted
-const SAGE = '#36D399'   // sage
+const V = '#6E56CF'
+const INK = '#0F1115'
+const MUTED = '#8A8F98'
+const SAGE = '#36D399'
 const PAPER = '#FAFAF7'
 const DIM = '#F1EFE7'
 
@@ -20,7 +20,6 @@ const TYPE_META = {
 const PRI_COLOR = { urgent: '#EF4444', high: '#F97316', medium: V, low: MUTED }
 
 // ─── Interactive Kanban demo ────────────────────────────────────────────────
-
 const INIT_CARDS = [
   { id: 1, type: 'bug',   title: 'Fix auth session expiry',  priority: 'urgent', pts: 3,  col: 0 },
   { id: 2, type: 'story', title: 'Design new onboarding',    priority: 'high',   pts: 5,  col: 0 },
@@ -30,7 +29,6 @@ const INIT_CARDS = [
   { id: 6, type: 'task',  title: 'Ship landing page',        priority: 'low',    pts: 2,  col: 2 },
   { id: 7, type: 'story', title: 'Notification centre',      priority: 'medium', pts: 3,  col: 3 },
 ]
-
 const COLS = ['To Do', 'In Progress', 'In Review', 'Done']
 
 function InteractiveKanban() {
@@ -39,26 +37,15 @@ function InteractiveKanban() {
   const [overCol, setOverCol] = useState(null)
   const [justMoved, setJustMoved] = useState(null)
 
-  function startDrag(e, id) {
-    e.dataTransfer.effectAllowed = 'move'
-    setDraggingId(id)
-  }
-  function onDragOver(e, col) {
-    e.preventDefault()
-    setOverCol(col)
-  }
+  function startDrag(e, id) { e.dataTransfer.effectAllowed = 'move'; setDraggingId(id) }
+  function onDragOver(e, col) { e.preventDefault(); setOverCol(col) }
   function onDrop(col) {
     if (draggingId === null) return
     setCards(prev => prev.map(c => c.id === draggingId ? { ...c, col } : c))
-    setJustMoved(draggingId)
-    setTimeout(() => setJustMoved(null), 700)
-    setDraggingId(null)
-    setOverCol(null)
+    setJustMoved(draggingId); setTimeout(() => setJustMoved(null), 700)
+    setDraggingId(null); setOverCol(null)
   }
-  function onDragEnd() {
-    setDraggingId(null)
-    setOverCol(null)
-  }
+  function onDragEnd() { setDraggingId(null); setOverCol(null) }
 
   return (
     <div className="flex gap-2 overflow-x-auto pb-1">
@@ -67,12 +54,8 @@ function InteractiveKanban() {
         const isOver = overCol === ci
         const accent = ['#8A8F98', '#6E56CF', '#F59E0B', '#36D399'][ci]
         return (
-          <div
-            key={col}
-            onDragOver={(e) => onDragOver(e, ci)}
-            onDrop={() => onDrop(ci)}
-            className={`flex-shrink-0 w-44 rounded-xl p-2 transition-colors duration-150 ${isOver ? 'bg-violet/10 ring-1 ring-violet/30' : 'bg-[#F1EFE7]'}`}
-          >
+          <div key={col} onDragOver={e => onDragOver(e, ci)} onDrop={() => onDrop(ci)}
+            className={`flex-shrink-0 w-44 rounded-xl p-2 transition-colors duration-150 ${isOver ? 'bg-violet/10 ring-1 ring-violet/30' : 'bg-[#F1EFE7]'}`}>
             <div className="flex items-center gap-1.5 mb-2 px-1">
               <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: accent }} />
               <p className="font-mono text-[9px] uppercase tracking-wider text-[#8A8F98]">{col}</p>
@@ -80,23 +63,16 @@ function InteractiveKanban() {
             </div>
             <div className="space-y-1.5 min-h-[40px]">
               <AnimatePresence>
-                {colCards.map((card) => {
+                {colCards.map(card => {
                   const tm = TYPE_META[card.type]
                   const isDragging = draggingId === card.id
                   const wasJustMoved = justMoved === card.id
                   return (
-                    <motion.div
-                      key={card.id}
-                      layout
-                      initial={{ opacity: 0, scale: 0.95 }}
+                    <motion.div key={card.id} layout initial={{ opacity: 0, scale: 0.95 }}
                       animate={{ opacity: isDragging ? 0.4 : 1, scale: wasJustMoved ? [1, 1.04, 1] : 1 }}
-                      exit={{ opacity: 0, scale: 0.9 }}
-                      transition={{ duration: 0.18 }}
-                      draggable
-                      onDragStart={(e) => startDrag(e, card.id)}
-                      onDragEnd={onDragEnd}
-                      className="bg-white rounded-lg p-2 shadow-sm border border-black/5 cursor-grab active:cursor-grabbing select-none hover:shadow-md hover:border-black/10 transition-shadow"
-                    >
+                      exit={{ opacity: 0, scale: 0.9 }} transition={{ duration: 0.18 }}
+                      draggable onDragStart={e => startDrag(e, card.id)} onDragEnd={onDragEnd}
+                      className="bg-white rounded-lg p-2 shadow-sm border border-black/5 cursor-grab active:cursor-grabbing select-none hover:shadow-md hover:border-black/10 transition-shadow">
                       <div className="flex items-center gap-1 mb-1">
                         <div className="w-1.5 h-1.5 rounded-sm" style={{ backgroundColor: tm.color }} />
                         <span className="font-mono text-[7px] uppercase tracking-wide" style={{ color: tm.color }}>{tm.label}</span>
@@ -112,8 +88,7 @@ function InteractiveKanban() {
               </AnimatePresence>
               {isOver && draggingId !== null && (
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-                  className="h-10 rounded-lg border-2 border-dashed border-violet/40 bg-violet/5"
-                />
+                  className="h-10 rounded-lg border-2 border-dashed border-violet/40 bg-violet/5" />
               )}
             </div>
           </div>
@@ -123,8 +98,7 @@ function InteractiveKanban() {
   )
 }
 
-// ─── Mini Backlog ───────────────────────────────────────────────────────────
-
+// ─── Mini Backlog ────────────────────────────────────────────────────────────
 const SPRINT_DATA = [
   {
     name: 'Sprint 12', status: 'active', pts: 18, done: 11,
@@ -147,45 +121,31 @@ const SPRINT_DATA = [
 function InteractiveBacklog() {
   const [expanded, setExpanded] = useState({ 0: true })
   const [checked, setChecked] = useState({})
-
   return (
     <div className="space-y-2">
       {SPRINT_DATA.map((sprint, si) => (
         <div key={sprint.name} className="bg-white rounded-xl border border-black/5 shadow-sm overflow-hidden">
-          <button
-            onClick={() => setExpanded(p => ({ ...p, [si]: !p[si] }))}
-            className="w-full flex items-center gap-2 px-3 py-2 bg-[#F1EFE7] hover:bg-[#E9E7DF] transition-colors text-left"
-          >
-            <motion.svg
-              animate={{ rotate: expanded[si] ? 90 : 0 }}
-              transition={{ duration: 0.15 }}
-              width="8" height="8" viewBox="0 0 8 8" fill="none" className="shrink-0"
-            >
+          <button onClick={() => setExpanded(p => ({ ...p, [si]: !p[si] }))}
+            className="w-full flex items-center gap-2 px-3 py-2 bg-[#F1EFE7] hover:bg-[#E9E7DF] transition-colors text-left">
+            <motion.svg animate={{ rotate: expanded[si] ? 90 : 0 }} transition={{ duration: 0.15 }}
+              width="8" height="8" viewBox="0 0 8 8" fill="none" className="shrink-0">
               <path d="M2 1l3 3-3 3" stroke={MUTED} strokeWidth="1.3" strokeLinecap="round" />
             </motion.svg>
             <span className="text-[10px] font-semibold text-[#0F1115] flex-1">{sprint.name}</span>
-            <span className={`font-mono text-[8px] px-1.5 py-0.5 rounded-full uppercase font-semibold ${sprint.status === 'active' ? 'bg-violet/15 text-violet' : 'bg-black/5 text-[#8A8F98]'}`}>
-              {sprint.status}
-            </span>
+            <span className={`font-mono text-[8px] px-1.5 py-0.5 rounded-full uppercase font-semibold ${sprint.status === 'active' ? 'bg-violet/15 text-violet' : 'bg-black/5 text-[#8A8F98]'}`}>{sprint.status}</span>
             <span className="font-mono text-[8px] text-[#8A8F98] ml-1">{sprint.done}/{sprint.pts}p</span>
           </button>
           <AnimatePresence>
             {expanded[si] && (
-              <motion.div
-                initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0 }}
-                transition={{ duration: 0.18 }} className="overflow-hidden"
-              >
+              <motion.div initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0 }} transition={{ duration: 0.18 }} className="overflow-hidden">
                 {sprint.issues.map((issue, ii) => {
                   const key = `${si}-${ii}`
                   const isDone = checked[key] !== undefined ? checked[key] : issue.done
                   const tm = TYPE_META[issue.type]
                   return (
-                    <motion.div
-                      key={ii}
-                      animate={{ opacity: isDone ? 0.55 : 1 }}
+                    <motion.div key={ii} animate={{ opacity: isDone ? 0.55 : 1 }}
                       className="flex items-center gap-2 px-3 py-1.5 border-b border-black/5 last:border-0 hover:bg-[#FAFAF7] transition-colors cursor-pointer"
-                      onClick={() => setChecked(p => ({ ...p, [key]: !isDone }))}
-                    >
+                      onClick={() => setChecked(p => ({ ...p, [key]: !isDone }))}>
                       <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0 transition-colors ${isDone ? 'bg-sage border-sage' : 'border-black/20'}`}>
                         {isDone && <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M1 4l2 2 4-3" stroke="white" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /></svg>}
                       </div>
@@ -208,8 +168,7 @@ function InteractiveBacklog() {
   )
 }
 
-// ─── Mini Timeline ──────────────────────────────────────────────────────────
-
+// ─── Mini Timeline ───────────────────────────────────────────────────────────
 const TL_BARS = [
   { label: 'Q3 Mobile Revamp', color: '#8B5CF6', left: 0,  width: 62, status: 'on track' },
   { label: 'Auth overhaul',    color: '#3B82F6', left: 8,  width: 38, status: 'on track' },
@@ -217,45 +176,37 @@ const TL_BARS = [
   { label: 'API v3',           color: '#F59E0B', left: 55, width: 32, status: 'at risk'   },
   { label: 'Notifications',    color: V,         left: 72, width: 22, status: 'planning'  },
 ]
-
 const ZOOMS = ['Month', 'Quarter']
 
 function InteractiveTimeline() {
   const [zoom, setZoom] = useState(0)
-  const labels = zoom === 0
-    ? ['Jun', 'Jul', 'Aug', 'Sep', 'Oct']
-    : ['Q2', 'Q3', 'Q4']
-
+  const labels = zoom === 0 ? ['Jun', 'Jul', 'Aug', 'Sep', 'Oct'] : ['Q2', 'Q3', 'Q4']
   return (
     <div>
       <div className="flex items-center justify-between mb-2">
         <div className="flex gap-0.5 bg-[#F1EFE7] rounded-lg p-0.5">
           {ZOOMS.map((z, i) => (
             <button key={z} onClick={() => setZoom(i)}
-              className={`text-[9px] font-mono px-2 py-1 rounded-md transition-colors ${zoom === i ? 'bg-white text-ink shadow-sm' : 'text-[#8A8F98]'}`}
-            >{z}</button>
+              className={`text-[9px] font-mono px-2 py-1 rounded-md transition-colors ${zoom === i ? 'bg-white text-ink shadow-sm' : 'text-[#8A8F98]'}`}>{z}</button>
           ))}
         </div>
         <span className="font-mono text-[8px] text-[#8A8F98]">5 epics</span>
       </div>
       <div className="flex text-[8px] font-mono uppercase tracking-wider text-[#8A8F98] mb-1.5">
-        {labels.map((m) => <span key={m} className="flex-1">{m}</span>)}
+        {labels.map(m => <span key={m} className="flex-1">{m}</span>)}
       </div>
       {TL_BARS.map((b, i) => (
         <motion.div key={i} className="flex items-center gap-2 h-6 mb-1.5"
           initial={{ opacity: 0, x: -8 }} whileInView={{ opacity: 1, x: 0 }}
-          transition={{ delay: i * 0.07 }} viewport={{ once: true }}
-        >
+          transition={{ delay: i * 0.07 }} viewport={{ once: true }}>
           <span className="text-[9px] text-[#8A8F98] w-20 shrink-0 truncate">{b.label}</span>
           <div className="flex-1 relative h-4">
-            <motion.div
-              initial={{ width: 0 }} whileInView={{ width: `${b.width}%` }}
+            <motion.div initial={{ width: 0 }} whileInView={{ width: `${b.width}%` }}
               transition={{ duration: 0.5, delay: i * 0.08 }} viewport={{ once: true }}
-              whileHover={{ scaleY: 1.2, opacity: 1 }}
+              whileHover={{ scaleY: 1.2 }}
               style={{ left: `${b.left}%`, backgroundColor: `${b.color}25`, borderLeft: `2.5px solid ${b.color}` }}
-              className="absolute h-full rounded-r-md cursor-pointer group"
-            >
-              <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[7px] font-medium opacity-70 group-hover:opacity-100 hidden group-hover:block whitespace-nowrap" style={{ color: b.color }}>{b.status}</span>
+              className="absolute h-full rounded-r-md cursor-pointer group">
+              <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[7px] font-medium opacity-0 group-hover:opacity-100 hidden group-hover:block whitespace-nowrap" style={{ color: b.color }}>{b.status}</span>
             </motion.div>
           </div>
         </motion.div>
@@ -265,70 +216,241 @@ function InteractiveTimeline() {
 }
 
 // ─── Mini Reports ────────────────────────────────────────────────────────────
-
 const VELOCITY = [22, 28, 31, 35, 30, 42]
 const BURNDOWN_IDEAL = [40, 35, 30, 25, 20, 15, 10, 5, 0]
 const BURNDOWN_ACTUAL = [40, 37, 32, 29, 24, 22, 17, 14, null]
 
 function InteractiveReport() {
   const [view, setView] = useState('velocity')
-
   return (
     <div>
       <div className="flex items-center justify-between mb-3">
-        <p className="font-mono text-[9px] uppercase tracking-wider text-[#8A8F98]">
-          {view === 'velocity' ? 'Sprint velocity' : 'Sprint burndown'}
-        </p>
+        <p className="font-mono text-[9px] uppercase tracking-wider text-[#8A8F98]">{view === 'velocity' ? 'Sprint velocity' : 'Sprint burndown'}</p>
         <div className="flex gap-0.5 bg-[#F1EFE7] rounded-lg p-0.5">
-          {['velocity', 'burndown'].map((v) => (
+          {['velocity', 'burndown'].map(v => (
             <button key={v} onClick={() => setView(v)}
-              className={`text-[9px] font-mono capitalize px-2 py-0.5 rounded-md transition-colors ${view === v ? 'bg-white text-ink shadow-sm' : 'text-[#8A8F98]'}`}
-            >{v}</button>
+              className={`text-[9px] font-mono capitalize px-2 py-0.5 rounded-md transition-colors ${view === v ? 'bg-white text-ink shadow-sm' : 'text-[#8A8F98]'}`}>{v}</button>
           ))}
         </div>
       </div>
-
       <AnimatePresence mode="wait">
         {view === 'velocity' ? (
-          <motion.div key="vel" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="flex items-end gap-2 h-20"
-          >
+          <motion.div key="vel" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex items-end gap-2 h-20">
             {VELOCITY.map((v, i) => {
               const max = Math.max(...VELOCITY)
               return (
                 <div key={i} className="flex-1 flex flex-col items-center gap-1">
                   <span className="text-[8px] font-mono text-[#8A8F98]">{v}</span>
-                  <motion.div
-                    initial={{ height: 0 }} whileInView={{ height: `${(v / max) * 60}px` }}
+                  <motion.div initial={{ height: 0 }} whileInView={{ height: `${(v / max) * 60}px` }}
                     transition={{ duration: 0.4, delay: i * 0.06 }} viewport={{ once: true }}
-                    whileHover={{ opacity: 1 }}
-                    className="w-full rounded-t-md cursor-pointer"
-                    style={{ backgroundColor: i === VELOCITY.length - 1 ? V : `${V}50` }}
-                  />
+                    className="w-full rounded-t-md" style={{ backgroundColor: i === VELOCITY.length - 1 ? V : `${V}50` }} />
                   <span className="text-[7px] font-mono text-[#8A8F98]">S{i + 1}</span>
                 </div>
               )
             })}
           </motion.div>
         ) : (
-          <motion.div key="burn" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="h-20 relative"
-          >
+          <motion.div key="burn" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="h-20 relative">
             <svg viewBox="0 0 200 80" className="w-full h-full" preserveAspectRatio="none">
-              {/* Ideal */}
-              <polyline
-                points={BURNDOWN_IDEAL.map((v, i) => `${(i / (BURNDOWN_IDEAL.length - 1)) * 200},${(v / 40) * 75 + 2}`).join(' ')}
-                fill="none" stroke={`${V}30`} strokeWidth="1.5" strokeDasharray="4 3"
-              />
-              {/* Actual */}
-              <polyline
-                points={BURNDOWN_ACTUAL.filter(v => v !== null).map((v, i) => `${(i / (BURNDOWN_IDEAL.length - 1)) * 200},${(v / 40) * 75 + 2}`).join(' ')}
-                fill="none" stroke={V} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-              />
+              <polyline points={BURNDOWN_IDEAL.map((v, i) => `${(i / (BURNDOWN_IDEAL.length - 1)) * 200},${(v / 40) * 75 + 2}`).join(' ')} fill="none" stroke={`${V}30`} strokeWidth="1.5" strokeDasharray="4 3" />
+              <polyline points={BURNDOWN_ACTUAL.filter(v => v !== null).map((v, i) => `${(i / (BURNDOWN_IDEAL.length - 1)) * 200},${(v / 40) * 75 + 2}`).join(' ')} fill="none" stroke={V} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
             <div className="absolute bottom-0 right-0 flex items-center gap-3 text-[7px] font-mono text-[#8A8F98]">
               <span className="flex items-center gap-1"><span style={{ background: V, width: 8, height: 2, display: 'inline-block', borderRadius: 2 }} />Actual</span>
-              <span className="flex items-center gap-1"><span style={{ background: `${V}50`, width: 8, height: 2, display: 'inline-block', borderRadius: 2, borderStyle: 'dashed' }} />Ideal</span>
+              <span className="flex items-center gap-1"><span style={{ background: `${V}50`, width: 8, height: 2, display: 'inline-block', borderRadius: 2 }} />Ideal</span>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
+// ─── Meetings & Video demo ───────────────────────────────────────────────────
+const DEMO_MEETINGS = [
+  { title: 'Sprint Review', date: 'Today', time: '2:00 PM', attendees: ['A', 'S', 'J'], live: true },
+  { title: 'Design sync', date: 'Tomorrow', time: '10:00 AM', attendees: ['M', 'P', 'D', 'R'], live: false },
+  { title: 'Retrospective', date: 'Friday', time: '4:00 PM', attendees: ['A', 'S'], live: false },
+]
+
+function MeetingsDemo() {
+  const [screen, setScreen] = useState('list') // 'list' | 'room'
+  const TILE_COLORS = ['#6E56CF', '#36D399', '#F59E0B', '#3B82F6']
+  const participants = ['Alex', 'Sara', 'Jordan', 'You']
+
+  if (screen === 'room') {
+    return (
+      <div className="bg-[#0a0b0f] rounded-xl p-2 space-y-1.5">
+        <div className="flex items-center justify-between px-1 mb-2">
+          <div className="flex items-center gap-1.5">
+            <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+            <span className="text-[9px] font-mono text-white/50">Sprint Review · 04:12</span>
+          </div>
+          <button onClick={() => setScreen('list')} className="text-[8px] text-white/30 hover:text-white/60 transition-colors">← Back</button>
+        </div>
+        <div className="grid grid-cols-2 gap-1.5">
+          {participants.map((name, i) => (
+            <div key={i} className={`rounded-lg p-2 flex flex-col items-center justify-center gap-1.5 relative ${name === 'You' ? 'ring-2 ring-violet' : ''}`}
+              style={{ background: `${TILE_COLORS[i]}15`, aspectRatio: '16/9' }}>
+              <div className="w-7 h-7 rounded-full flex items-center justify-center text-[9px] font-bold text-white"
+                style={{ backgroundColor: `${TILE_COLORS[i]}70` }}>{name[0]}</div>
+              <span className="text-[8px] text-white/60 font-mono">{name}</span>
+              {i === 0 && <div className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-sage" title="Speaking" />}
+            </div>
+          ))}
+        </div>
+        <div className="flex items-center justify-center gap-3 pt-1">
+          {['🎤', '📷', '🖥', '📞'].map((icon, i) => (
+            <button key={i} className={`w-7 h-7 rounded-full flex items-center justify-center text-sm transition-colors ${i === 3 ? 'bg-red-500/80 hover:bg-red-500' : 'bg-white/8 hover:bg-white/15'}`}>{icon}</button>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-1.5">
+      {DEMO_MEETINGS.map((m, i) => (
+        <motion.div key={i} initial={{ opacity: 0, x: -6 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.07 }}
+          className="bg-white rounded-xl border border-black/5 p-2.5 flex items-center gap-2.5 hover:border-black/10 transition-colors">
+          <div className={`w-9 h-9 rounded-xl flex flex-col items-center justify-center shrink-0 ${m.live ? 'bg-violet/10 ring-1 ring-violet/20' : 'bg-[#F1EFE7]'}`}>
+            <span className="font-mono text-[7px] uppercase text-slate-muted leading-none">{m.date.slice(0, 3)}</span>
+            <span className="font-bold text-[11px] text-ink leading-none mt-0.5">{m.live ? '●' : m.time.split(':')[0]}</span>
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-[10px] font-semibold text-ink truncate">{m.title}</p>
+            <div className="flex items-center gap-1.5 mt-0.5">
+              {m.live && <span className="font-mono text-[8px] text-red-500 font-semibold">● LIVE</span>}
+              <span className="text-[9px] text-slate-muted">{m.time}</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-1 shrink-0">
+            <div className="flex -space-x-1">
+              {m.attendees.slice(0, 3).map((a, j) => (
+                <div key={j} className="w-4 h-4 rounded-full border border-white flex items-center justify-center text-[6px] font-bold text-white"
+                  style={{ backgroundColor: TILE_COLORS[j] }}>{a}</div>
+              ))}
+            </div>
+            {m.live ? (
+              <motion.button whileTap={{ scale: 0.95 }} onClick={() => setScreen('room')}
+                className="ml-1 text-[8px] font-semibold bg-violet text-white px-2 py-0.5 rounded-lg hover:bg-violet/90 transition-colors">
+                Join
+              </motion.button>
+            ) : (
+              <span className="ml-1 text-[8px] text-slate-muted font-mono">{m.attendees.length} ppl</span>
+            )}
+          </div>
+        </motion.div>
+      ))}
+      <button onClick={() => setScreen('room')}
+        className="w-full text-[9px] text-violet border border-violet/20 hover:bg-violet/5 rounded-xl py-1.5 transition-colors font-medium">
+        Preview video room →
+      </button>
+    </div>
+  )
+}
+
+// ─── Smart Tools demo (Focus + Standup + Sprint Health) ─────────────────────
+const C36 = 2 * Math.PI * 28
+
+function SmartToolsDemo() {
+  const [tab, setTab] = useState('focus')
+  const [copied, setCopied] = useState(false)
+
+  function handleCopy() { setCopied(true); setTimeout(() => setCopied(false), 1800) }
+
+  const STANDUP_TEXT = `✅ Done: Shipped auth redesign\n🔄 Today: Sprint review prep\n   + Write onboarding copy\n✓ No blockers`
+  const HEALTH_SCORE = 87
+  const HEALTH_PTS = 2 * Math.PI * 36
+
+  return (
+    <div>
+      <div className="flex gap-0.5 bg-[#F1EFE7] rounded-lg p-0.5 mb-3">
+        {[['focus', '🎯 Focus'], ['standup', '📢 Standup'], ['health', '📊 Health']].map(([id, label]) => (
+          <button key={id} onClick={() => setTab(id)}
+            className={`flex-1 text-[9px] font-mono px-2 py-1 rounded-md transition-colors ${tab === id ? 'bg-white text-ink shadow-sm' : 'text-[#8A8F98]'}`}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      <AnimatePresence mode="wait">
+        {tab === 'focus' && (
+          <motion.div key="focus" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="bg-[#0F1115] rounded-xl p-4 flex flex-col items-center gap-3">
+            <p className="font-mono text-[8px] uppercase tracking-widest text-white/30">Focusing on</p>
+            <p className="text-[10px] font-medium text-white text-center">Dashboard UI redesign</p>
+            <div className="relative flex items-center justify-center">
+              <svg width="80" height="80" viewBox="0 0 80 80">
+                <circle cx="40" cy="40" r="28" stroke="rgba(255,255,255,0.06)" strokeWidth="5" fill="none" />
+                <motion.circle cx="40" cy="40" r="28" stroke="#6E56CF" strokeWidth="5" fill="none"
+                  strokeLinecap="round" strokeDasharray={C36}
+                  animate={{ strokeDashoffset: [C36 * 0.15, C36 * 0.65, C36 * 0.15] }}
+                  transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut' }}
+                  transform="rotate(-90 40 40)" />
+              </svg>
+              <div className="absolute text-center">
+                <p className="font-mono text-sm font-bold text-white leading-none">23:41</p>
+                <p className="font-mono text-[7px] text-white/30 uppercase tracking-wide mt-0.5">focus</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-1 text-[8px] font-mono text-white/30">
+              <span>⏱ 2h 15m logged today</span>
+            </div>
+          </motion.div>
+        )}
+
+        {tab === 'standup' && (
+          <motion.div key="standup" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="bg-white rounded-xl border border-black/5 p-3">
+            <div className="flex items-center justify-between mb-2">
+              <p className="font-mono text-[9px] uppercase tracking-wider text-slate-muted">Generated · Sprint 12</p>
+              <motion.button onClick={handleCopy} whileTap={{ scale: 0.95 }}
+                className={`text-[8px] font-mono px-2 py-0.5 rounded-lg border transition-colors ${copied ? 'bg-sage/15 text-sage border-sage/20' : 'border-black/10 text-slate-muted hover:text-ink'}`}>
+                {copied ? '✓ Copied' : 'Copy'}
+              </motion.button>
+            </div>
+            {STANDUP_TEXT.split('\n').map((line, i) => (
+              <motion.p key={i} initial={{ opacity: 0, x: -4 }} animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: i * 0.06 }}
+                className="text-[10px] text-ink leading-relaxed font-mono">{line}</motion.p>
+            ))}
+          </motion.div>
+        )}
+
+        {tab === 'health' && (
+          <motion.div key="health" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="bg-white rounded-xl border border-black/5 p-3">
+            <div className="flex items-center gap-4">
+              <div className="relative flex items-center justify-center shrink-0">
+                <svg width="64" height="64" viewBox="0 0 64 64">
+                  <circle cx="32" cy="32" r="24" stroke="rgba(0,0,0,0.06)" strokeWidth="5" fill="none" />
+                  <motion.circle cx="32" cy="32" r="24" stroke="#36D399" strokeWidth="5" fill="none"
+                    strokeLinecap="round"
+                    strokeDasharray={`${2*Math.PI*24}`}
+                    animate={{ strokeDashoffset: `${2*Math.PI*24 * (1 - HEALTH_SCORE/100)}` }}
+                    transition={{ duration: 1, ease: [0.16,1,0.3,1] }}
+                    transform="rotate(-90 32 32)" />
+                </svg>
+                <div className="absolute text-center">
+                  <p className="font-bold text-sm text-ink">{HEALTH_SCORE}</p>
+                </div>
+              </div>
+              <div className="flex-1">
+                <p className="text-[10px] font-semibold text-ink mb-1">Sprint Health Score</p>
+                <div className="inline-flex items-center gap-1 bg-sage/10 px-2 py-0.5 rounded-full mb-2">
+                  <div className="w-1.5 h-1.5 rounded-full bg-sage" />
+                  <span className="text-[8px] font-mono text-sage font-semibold">On track</span>
+                </div>
+                <div className="space-y-1">
+                  {[['Velocity', '42p/sprint', '#36D399'], ['Forecast', '2d ahead', '#36D399'], ['Done', '62%', '#6E56CF']].map(([k, v, c]) => (
+                    <div key={k} className="flex items-center justify-between text-[9px]">
+                      <span className="text-slate-muted">{k}</span>
+                      <span className="font-mono font-semibold" style={{ color: c }}>{v}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           </motion.div>
         )}
@@ -338,7 +460,6 @@ function InteractiveReport() {
 }
 
 // ─── Feature section ─────────────────────────────────────────────────────────
-
 const FEATURES = [
   {
     tag: 'Board',
@@ -357,7 +478,7 @@ const FEATURES = [
   {
     tag: 'Timeline',
     title: 'Roadmap at a glance',
-    body: "Visualize your project on a Gantt chart. Zoom from months to quarters, spot scheduling conflicts, and see what's at risk — before it's too late.",
+    body: "Visualize your project on a Gantt chart. Zoom from months to quarters, spot scheduling conflicts, and see what's at risk before it's too late.",
     demo: <InteractiveTimeline />,
     hint: 'Switch zoom levels →',
   },
@@ -368,34 +489,41 @@ const FEATURES = [
     demo: <InteractiveReport />,
     hint: 'Toggle chart type →',
   },
+  {
+    tag: 'Meetings',
+    title: 'Video meetings without leaving the app',
+    body: 'Schedule meetings, write structured notes with action items, and jump into a WebRTC video room — no Zoom link needed. Invite emails go out automatically.',
+    demo: <MeetingsDemo />,
+    hint: 'Click Join to preview the room →',
+  },
+  {
+    tag: 'Smart Tools',
+    title: 'Productivity features no PM tool has',
+    body: 'Focus Mode tracks deep-work time automatically. Standup Generator writes your daily update from real activity. Sprint Health Score predicts whether you\'ll finish on time.',
+    demo: <SmartToolsDemo />,
+    hint: 'Switch between tools →',
+  },
 ]
 
 function FeatureCard({ feature, index }) {
   const ref = useRef(null)
   const inView = useInView(ref, { once: true, margin: '-60px' })
   return (
-    <motion.div
-      ref={ref}
-      initial={{ opacity: 0, y: 28 }}
-      animate={inView ? { opacity: 1, y: 0 } : {}}
+    <motion.div ref={ref} initial={{ opacity: 0, y: 28 }} animate={inView ? { opacity: 1, y: 0 } : {}}
       transition={{ duration: 0.5, delay: (index % 2) * 0.12 }}
-      className="bg-white rounded-2xl border border-black/8 overflow-hidden shadow-sm hover:shadow-md transition-shadow"
-    >
+      className="bg-white rounded-2xl border border-black/8 overflow-hidden shadow-sm hover:shadow-md transition-shadow">
       <div className="p-6">
         <span className="font-mono text-[10px] uppercase tracking-wider text-violet mb-2 block">{feature.tag}</span>
         <h3 className="text-base font-semibold text-ink mb-2">{feature.title}</h3>
         <p className="text-sm text-[#8A8F98] leading-relaxed mb-5">{feature.body}</p>
-        <div className="bg-[#FAFAF7] rounded-xl p-3 border border-black/5">
-          {feature.demo}
-        </div>
+        <div className="bg-[#FAFAF7] rounded-xl p-3 border border-black/5">{feature.demo}</div>
         <p className="text-[9px] font-mono text-[#8A8F98]/70 mt-2 text-center">{feature.hint}</p>
       </div>
     </motion.div>
   )
 }
 
-// ─── Animated stat ─────────────────────────────────────────────────────────
-
+// ─── Animated stat ───────────────────────────────────────────────────────────
 function AnimatedStat({ value, suffix = '', label, icon }) {
   const ref = useRef(null)
   const inView = useInView(ref, { once: true })
@@ -424,34 +552,40 @@ function AnimatedStat({ value, suffix = '', label, icon }) {
 }
 
 // ─── Testimonials ─────────────────────────────────────────────────────────
-
 const TESTIMONIALS = [
   {
-    quote: "We replaced Jira and three separate tools with Tasklane. The sprint board alone saved us two hours every standup.",
+    quote: "We replaced Jira, Zoom, and three separate tools with Tasklane. The built-in video rooms and standup generator alone saved us two hours a week.",
     author: 'Marcus Reyes',
     title: 'Engineering Lead · Vertix',
     color: '#6E56CF',
   },
   {
-    quote: "The UI is the first project management tool our designers actually wanted to use. The timeline view is 🤌.",
+    quote: "The UI is the first PM tool our designers actually wanted to use. Focus Mode has become the team's favourite — everyone ships more when they can block out distractions.",
     author: 'Anika Patel',
     title: 'Head of Product · Lumio',
     color: '#36D399',
   },
   {
-    quote: "Set up in 15 minutes, migrated our entire backlog in an afternoon. Real-time updates across the whole team instantly.",
+    quote: "Set up in 15 minutes. The Sprint Health Score flagged a slip three days early — we re-scoped and still shipped on time. Real-time updates across the whole team, no plugins.",
     author: 'Tom Fischer',
     title: 'CTO · NordStack',
     color: '#3B82F6',
   },
 ]
 
-// ─── FAQ ───────────────────────────────────────────────────────────────────
-
+// ─── FAQ ─────────────────────────────────────────────────────────────────────
 const FAQS = [
   {
     q: 'How is Tasklane different from Jira?',
-    a: "Tasklane has the same core features — sprints, epics, backlogs, timelines, reports — but with a UI your team will actually enjoy using. Setup takes minutes, not an IT ticket. No configuration hell.",
+    a: "Tasklane has the same core features — sprints, epics, backlogs, timelines, reports — but with a UI your team will actually enjoy. It also ships things Jira never will: built-in video rooms, Focus Mode, Standup Generator, and Sprint Health Score. Setup takes minutes, not an IT ticket.",
+  },
+  {
+    q: 'Do I need Zoom or Google Meet for video calls?',
+    a: "No. Tasklane has built-in video rooms powered by WebRTC — no plugins, no accounts, no external links required. Just click \"Join Room\" from any meeting. You can still link an external meeting URL if you prefer.",
+  },
+  {
+    q: 'What is Focus Mode?',
+    a: "Focus Mode is a Pomodoro-style timer built into every task. Start it and Tasklane tracks your deep-work time automatically, logs it to the task, and keeps you focused with a full-screen overlay. The Standup Generator then uses this data to write your daily update.",
   },
   {
     q: 'Can I import from Jira or Trello?',
@@ -462,47 +596,26 @@ const FAQS = [
     a: 'You pay per workspace (your company or org), not per person. Invite your whole team on the Pro plan for $10/month — no per-seat surcharges.',
   },
   {
-    q: 'Is there a self-hosted option?',
-    a: "Not yet. Tasklane is currently cloud-only. Self-hosted Enterprise is on the roadmap — join the waitlist via the Contact form.",
-  },
-  {
     q: 'How does the Free plan work?',
     a: 'Free forever — 1 project, up to 3 team members, full Kanban board and sprint backlog. No time limit, no credit card required.',
-  },
-  {
-    q: 'What support options are available?',
-    a: 'Free plan: community forum. Pro: email support with a 48h SLA. Company: priority email and Slack Connect with 4h SLA during business hours.',
   },
 ]
 
 function FaqItem({ q, a, index }) {
   const [open, setOpen] = useState(false)
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 12 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.06 }}
-      viewport={{ once: true }}
-      className="border-b border-black/8 last:border-0"
-    >
-      <button
-        onClick={() => setOpen(v => !v)}
-        className="w-full flex items-center justify-between gap-4 py-4 text-left group"
-      >
+    <motion.div initial={{ opacity: 0, y: 12 }} whileInView={{ opacity: 1, y: 0 }}
+      transition={{ delay: index * 0.06 }} viewport={{ once: true }}
+      className="border-b border-black/8 last:border-0">
+      <button onClick={() => setOpen(v => !v)} className="w-full flex items-center justify-between gap-4 py-4 text-left group">
         <span className="text-sm font-medium text-ink group-hover:text-violet transition-colors">{q}</span>
         <motion.span animate={{ rotate: open ? 45 : 0 }} transition={{ duration: 0.2 }}
-          className="text-[#8A8F98] text-xl leading-none shrink-0 group-hover:text-violet transition-colors"
-        >+</motion.span>
+          className="text-[#8A8F98] text-xl leading-none shrink-0 group-hover:text-violet transition-colors">+</motion.span>
       </button>
       <AnimatePresence>
         {open && (
-          <motion.p
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="overflow-hidden text-sm text-[#8A8F98] leading-relaxed pb-4"
-          >{a}</motion.p>
+          <motion.p initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }} className="overflow-hidden text-sm text-[#8A8F98] leading-relaxed pb-4">{a}</motion.p>
         )}
       </AnimatePresence>
     </motion.div>
@@ -510,17 +623,16 @@ function FaqItem({ q, a, index }) {
 }
 
 // ─── Contact form ─────────────────────────────────────────────────────────
-
 function ContactForm() {
   const [form, setForm] = useState({ name: '', email: '', type: 'general', message: '' })
-  const [status, setStatus] = useState('idle') // idle | sending | done
+  const [status, setStatus] = useState('idle')
   const [errors, setErrors] = useState({})
 
   function validate() {
     const e = {}
-    if (!form.name.trim())    e.name = 'Name is required'
-    if (!form.email.includes('@')) e.email = 'Valid email required'
-    if (!form.message.trim()) e.message = 'Message is required'
+    if (!form.name.trim())        e.name    = 'Name is required'
+    if (!form.email.includes('@')) e.email   = 'Valid email required'
+    if (!form.message.trim())     e.message = 'Message is required'
     return e
   }
 
@@ -528,33 +640,25 @@ function ContactForm() {
     e.preventDefault()
     const e2 = validate()
     if (Object.keys(e2).length) { setErrors(e2); return }
-    setErrors({})
-    setStatus('sending')
+    setErrors({}); setStatus('sending')
     setTimeout(() => setStatus('done'), 1400)
   }
 
-  const field = 'w-full text-sm rounded-xl border border-black/10 px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-violet/30 bg-white placeholder:text-[#8A8F98]/60 transition-all'
+  const fieldCls = 'w-full text-sm rounded-xl border border-black/10 px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-violet/30 bg-white placeholder:text-[#8A8F98]/60 transition-all'
 
   if (status === 'done') {
     return (
-      <motion.div
-        initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }}
-        className="flex flex-col items-center justify-center text-center py-12 gap-4"
-      >
-        <motion.div
-          initial={{ scale: 0 }} animate={{ scale: 1 }}
+      <motion.div initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }}
+        className="flex flex-col items-center justify-center text-center py-12 gap-4">
+        <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }}
           transition={{ type: 'spring', stiffness: 200, damping: 15, delay: 0.1 }}
-          className="w-14 h-14 bg-sage/15 rounded-2xl flex items-center justify-center"
-        >
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-            <path d="M5 13l4 4L19 7" stroke="#36D399" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
+          className="w-14 h-14 bg-sage/15 rounded-2xl flex items-center justify-center">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="#36D399" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
         </motion.div>
         <h3 className="font-semibold text-ink text-lg">Message received!</h3>
         <p className="text-sm text-[#8A8F98] max-w-xs">We'll get back to you at <strong>{form.email}</strong> within 24 hours.</p>
         <button onClick={() => { setStatus('idle'); setForm({ name: '', email: '', type: 'general', message: '' }) }}
-          className="text-xs text-violet hover:opacity-70 mt-2 transition-opacity"
-        >Send another message</button>
+          className="text-xs text-violet hover:opacity-70 mt-2 transition-opacity">Send another message</button>
       </motion.div>
     )
   }
@@ -564,16 +668,16 @@ function ContactForm() {
       <div className="grid sm:grid-cols-2 gap-4">
         <div>
           <input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))}
-            placeholder="Your name" className={`${field} ${errors.name ? 'border-red-400 ring-1 ring-red-400/30' : ''}`} />
+            placeholder="Your name" className={`${fieldCls} ${errors.name ? 'border-red-400 ring-1 ring-red-400/30' : ''}`} />
           {errors.name && <p className="text-xs text-red-500 mt-1">{errors.name}</p>}
         </div>
         <div>
           <input type="email" value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))}
-            placeholder="you@company.com" className={`${field} ${errors.email ? 'border-red-400 ring-1 ring-red-400/30' : ''}`} />
+            placeholder="you@company.com" className={`${fieldCls} ${errors.email ? 'border-red-400 ring-1 ring-red-400/30' : ''}`} />
           {errors.email && <p className="text-xs text-red-500 mt-1">{errors.email}</p>}
         </div>
       </div>
-      <select value={form.type} onChange={e => setForm(p => ({ ...p, type: e.target.value }))} className={field}>
+      <select value={form.type} onChange={e => setForm(p => ({ ...p, type: e.target.value }))} className={fieldCls}>
         <option value="general">General inquiry</option>
         <option value="sales">Sales / pricing</option>
         <option value="support">Technical support</option>
@@ -583,60 +687,81 @@ function ContactForm() {
       <div>
         <textarea value={form.message} onChange={e => setForm(p => ({ ...p, message: e.target.value }))}
           placeholder="Tell us what's on your mind…" rows={4}
-          className={`${field} resize-none ${errors.message ? 'border-red-400 ring-1 ring-red-400/30' : ''}`} />
+          className={`${fieldCls} resize-none ${errors.message ? 'border-red-400 ring-1 ring-red-400/30' : ''}`} />
         {errors.message && <p className="text-xs text-red-500 mt-1">{errors.message}</p>}
       </div>
-      <motion.button
-        whileTap={{ scale: 0.97 }}
-        type="submit"
-        disabled={status === 'sending'}
-        className="w-full py-3 bg-ink text-white text-sm font-medium rounded-xl hover:bg-ink/90 transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
-      >
+      <motion.button whileTap={{ scale: 0.97 }} type="submit" disabled={status === 'sending'}
+        className="w-full py-3 bg-ink text-white text-sm font-medium rounded-xl hover:bg-ink/90 transition-colors disabled:opacity-60 flex items-center justify-center gap-2">
         {status === 'sending' ? (
-          <>
-            <motion.span animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 0.8, ease: 'linear' }}
-              className="inline-block w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full"
-            />
-            Sending…
-          </>
+          <><motion.span animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 0.8, ease: 'linear' }}
+            className="inline-block w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full" />Sending…</>
         ) : 'Send message'}
       </motion.button>
     </form>
   )
 }
 
-// ─── Floating cursor glow ──────────────────────────────────────────────────
-
+// ─── Cursor glow ─────────────────────────────────────────────────────────────
 function CursorGlow() {
-  const x = useMotionValue(0)
-  const y = useMotionValue(0)
-  const sx = useSpring(x, { stiffness: 80, damping: 20 })
-  const sy = useSpring(y, { stiffness: 80, damping: 20 })
-
+  const x = useMotionValue(0); const y = useMotionValue(0)
+  const sx = useSpring(x, { stiffness: 80, damping: 20 }); const sy = useSpring(y, { stiffness: 80, damping: 20 })
   useEffect(() => {
-    const move = (e) => { x.set(e.clientX); y.set(e.clientY) }
+    const move = e => { x.set(e.clientX); y.set(e.clientY) }
     window.addEventListener('mousemove', move)
     return () => window.removeEventListener('mousemove', move)
   }, [x, y])
-
   return (
-    <motion.div
-      style={{ left: sx, top: sy, background: `radial-gradient(circle, ${V}40 0%, transparent 70%)` }}
+    <motion.div style={{ left: sx, top: sy, background: `radial-gradient(circle, ${V}40 0%, transparent 70%)` }}
       className="fixed pointer-events-none w-64 h-64 rounded-full -translate-x-1/2 -translate-y-1/2 z-0"
-      animate={{ opacity: [0.04, 0.07, 0.04] }}
-      transition={{ duration: 4, repeat: Infinity }}
-    />
+      animate={{ opacity: [0.04, 0.07, 0.04] }} transition={{ duration: 4, repeat: Infinity }} />
   )
 }
 
-// ─── Main component ─────────────────────────────────────────────────────────
+// ─── Live activity feed ───────────────────────────────────────────────────────
+function LiveActivityFeed() {
+  const ACTIVITIES = [
+    { user: 'Priya',  action: 'joined Sprint Review video room',          time: 'just now', color: V },
+    { user: 'Daniel', action: 'generated standup for Sprint 12',          time: '1m ago',   color: SAGE },
+    { user: 'Sara',   action: 'commented on "Dashboard redesign"',        time: '4m ago',   color: '#F59E0B' },
+    { user: 'Alex',   action: 'started Focus Mode on "API v3 auth"',      time: '9m ago',   color: '#3B82F6' },
+    { user: 'Mia',    action: 'logged 2h via Focus Mode on "Mobile sync"',time: '12m ago',  color: '#8B5CF6' },
+    { user: 'James',  action: 'created epic "Q4 Redesign"',               time: '18m ago',  color: '#EF4444' },
+  ]
+  const [highlighted, setHighlighted] = useState(0)
+  useEffect(() => {
+    const t = setInterval(() => setHighlighted(i => (i + 1) % ACTIVITIES.length), 2200)
+    return () => clearInterval(t)
+  }, [])
 
+  return (
+    <div className="bg-white rounded-2xl border border-black/8 p-5 shadow-sm space-y-2.5">
+      <div className="flex items-center gap-2 mb-4">
+        <div className="w-1.5 h-1.5 rounded-full bg-sage animate-pulse" />
+        <p className="font-mono text-[10px] uppercase tracking-wider text-[#8A8F98]">Live activity</p>
+      </div>
+      {ACTIVITIES.map((item, i) => (
+        <motion.div key={i} initial={{ opacity: 0, x: 10 }} whileInView={{ opacity: 1, x: 0 }}
+          transition={{ delay: i * 0.07 }} viewport={{ once: true }}
+          animate={{ backgroundColor: highlighted === i ? '#6E56CF08' : '#ffffff' }}
+          className="flex items-start gap-3 rounded-xl px-2 py-1.5 transition-colors">
+          <div className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[9px] font-bold shrink-0 mt-0.5" style={{ backgroundColor: item.color }}>{item.user[0]}</div>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs text-ink"><span className="font-semibold">{item.user}</span>{' '}<span className="text-[#8A8F98]">{item.action}</span></p>
+            <p className="font-mono text-[9px] text-[#8A8F98] mt-0.5">{item.time}</p>
+          </div>
+          {highlighted === i && <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="w-1.5 h-1.5 rounded-full bg-sage mt-1.5 shrink-0" />}
+        </motion.div>
+      ))}
+    </div>
+  )
+}
+
+// ─── Main component ───────────────────────────────────────────────────────────
 export default function LandingPage() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [annual, setAnnual] = useState(false)
   const [activeNav, setActiveNav] = useState('')
 
-  // Highlight nav on scroll
   useEffect(() => {
     const handler = () => {
       const sections = ['features', 'how-it-works', 'pricing', 'contact']
@@ -651,17 +776,17 @@ export default function LandingPage() {
   }, [])
 
   const NAV_LINKS = [
-    { href: '#features',      label: 'Features' },
-    { href: '#how-it-works',  label: 'How it works' },
-    { href: '#pricing',       label: 'Pricing' },
-    { href: '#contact',       label: 'Contact' },
+    { href: '#features',     label: 'Features' },
+    { href: '#how-it-works', label: 'How it works' },
+    { href: '#pricing',      label: 'Pricing' },
+    { href: '#contact',      label: 'Contact' },
   ]
 
   return (
     <div className="bg-[#FAFAF7] text-[#0F1115] min-h-screen overflow-x-hidden relative">
       <CursorGlow />
 
-      {/* ── Nav ──────────────────────────────────────────────────────────── */}
+      {/* ── Nav ────────────────────────────────────────────────────────────── */}
       <header className="sticky top-0 z-40 border-b border-black/5 bg-[#FAFAF7]/90 backdrop-blur-sm">
         <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -675,16 +800,15 @@ export default function LandingPage() {
               const id = href.slice(1)
               return (
                 <a key={href} href={href}
-                  className={`text-sm px-3 py-1.5 rounded-lg transition-colors ${activeNav === id ? 'text-violet bg-violet/8 font-medium' : 'text-[#8A8F98] hover:text-[#0F1115] hover:bg-black/[0.04]'}`}
-                >{label}</a>
+                  className={`text-sm px-3 py-1.5 rounded-lg transition-colors ${activeNav === id ? 'text-violet bg-violet/8 font-medium' : 'text-[#8A8F98] hover:text-[#0F1115] hover:bg-black/[0.04]'}`}>
+                  {label}
+                </a>
               )
             })}
           </nav>
           <div className="hidden sm:flex items-center gap-2">
             <Link to="/login" className="text-sm text-[#8A8F98] hover:text-[#0F1115] transition-colors px-3 py-1.5 rounded-lg hover:bg-black/[0.04]">Log in</Link>
-            <Link to="/signup" className="text-sm bg-[#0F1115] text-white rounded-full px-4 py-2 hover:bg-[#0F1115]/90 transition-colors font-medium">
-              Get started free
-            </Link>
+            <Link to="/signup" className="text-sm bg-[#0F1115] text-white rounded-full px-4 py-2 hover:bg-[#0F1115]/90 transition-colors font-medium">Get started free</Link>
           </div>
           <button className="sm:hidden text-[#8A8F98] p-1" onClick={() => setMobileOpen(v => !v)}>
             <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
@@ -695,8 +819,7 @@ export default function LandingPage() {
         <AnimatePresence>
           {mobileOpen && (
             <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}
-              className="sm:hidden border-t border-black/5 bg-[#FAFAF7] overflow-hidden"
-            >
+              className="sm:hidden border-t border-black/5 bg-[#FAFAF7] overflow-hidden">
               <div className="px-6 py-4 space-y-3">
                 {NAV_LINKS.map(({ href, label }) => (
                   <a key={href} href={href} onClick={() => setMobileOpen(false)} className="block text-sm text-[#8A8F98]">{label}</a>
@@ -709,34 +832,30 @@ export default function LandingPage() {
         </AnimatePresence>
       </header>
 
-      {/* ── Hero ─────────────────────────────────────────────────────────── */}
+      {/* ── Hero ───────────────────────────────────────────────────────────── */}
       <section className="max-w-6xl mx-auto px-6 pt-16 sm:pt-24 pb-20 relative">
-        {/* Background grid */}
         <div className="absolute inset-0 opacity-[0.025] pointer-events-none"
           style={{ backgroundImage: 'radial-gradient(#0F1115 1px, transparent 1px)', backgroundSize: '24px 24px' }} />
 
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}
-          className="text-center max-w-3xl mx-auto mb-14 relative"
-        >
+          className="text-center max-w-3xl mx-auto mb-14 relative">
           <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.4 }}
-            className="inline-flex items-center gap-2 bg-[#6E56CF]/10 text-[#6E56CF] rounded-full px-3.5 py-1.5 text-xs font-mono uppercase tracking-wider mb-6"
-          >
+            className="inline-flex items-center gap-2 bg-[#6E56CF]/10 text-[#6E56CF] rounded-full px-3.5 py-1.5 text-xs font-mono uppercase tracking-wider mb-6">
             <span className="w-1.5 h-1.5 bg-[#6E56CF] rounded-full animate-pulse" />
-            Jira features · delightful design
+            Boards · Video Meetings · Focus Mode · Standup AI
           </motion.div>
 
           <h1 className="text-4xl sm:text-6xl font-bold tracking-tight leading-[1.05] mb-5">
             The project tool your
             <br className="hidden sm:block" />
-            <span className="text-[#6E56CF]"> team actually uses.</span>
+            <span className="text-[#6E56CF]"> team actually ships with.</span>
           </h1>
           <p className="text-base sm:text-lg text-[#8A8F98] leading-relaxed max-w-xl mx-auto mb-8">
-            Kanban boards, sprint backlogs, timelines, reports, team chat — every Jira workflow, with a UI your team will love. Up and running in 5 minutes.
+            Kanban boards, sprint backlogs, built-in video meetings, Focus Mode, Standup Generator, and Sprint Health Score — everything in one place, with a UI your team will love.
           </p>
           <div className="flex flex-wrap items-center justify-center gap-3">
             <Link to="/signup"
-              className="bg-[#6E56CF] text-white rounded-full px-6 py-3 text-sm font-medium hover:bg-[#6E56CF]/90 transition-all shadow-lg shadow-violet-500/25 hover:shadow-violet-500/40 hover:-translate-y-0.5"
-            >
+              className="bg-[#6E56CF] text-white rounded-full px-6 py-3 text-sm font-medium hover:bg-[#6E56CF]/90 transition-all shadow-lg shadow-violet-500/25 hover:shadow-violet-500/40 hover:-translate-y-0.5">
               Start for free →
             </Link>
             <a href="#features" className="text-sm text-[#0F1115] border border-black/15 rounded-full px-6 py-3 hover:bg-black/[0.04] transition-colors">
@@ -748,9 +867,7 @@ export default function LandingPage() {
 
         {/* App window preview */}
         <motion.div initial={{ opacity: 0, y: 32 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.2 }}
-          className="bg-white rounded-3xl border border-black/8 shadow-2xl shadow-black/8 overflow-hidden"
-        >
-          {/* Window chrome */}
+          className="bg-white rounded-3xl border border-black/8 shadow-2xl shadow-black/8 overflow-hidden">
           <div className="flex items-center gap-1.5 px-4 py-3 border-b border-black/5 bg-[#F1EFE7]">
             <div className="w-2.5 h-2.5 rounded-full bg-red-400/70" />
             <div className="w-2.5 h-2.5 rounded-full bg-amber-400/70" />
@@ -782,22 +899,21 @@ export default function LandingPage() {
                 <p className="font-mono text-[8px] uppercase tracking-wider text-[#8A8F98] px-2 mb-1">Planning</p>
                 {['Board', 'Backlog', 'Timeline'].map((item, i) => (
                   <div key={item} className={`flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs mb-0.5 ${i === 0 ? 'bg-[#6E56CF]/10 text-[#6E56CF] font-medium' : 'text-[#8A8F98]'}`}>
-                    <div className="w-1.5 h-1.5 rounded-full bg-current" />
-                    {item}
+                    <div className="w-1.5 h-1.5 rounded-full bg-current" />{item}
                   </div>
                 ))}
               </div>
               <div>
                 <p className="font-mono text-[8px] uppercase tracking-wider text-[#8A8F98] px-2 mb-1">Collaborate</p>
-                {['Chat', 'Activity'].map((item) => (
+                {['Chat', 'Meetings', 'Activity'].map(item => (
                   <div key={item} className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs text-[#8A8F98] mb-0.5">
-                    <div className="w-1.5 h-1.5 rounded-full bg-current" />
-                    {item}
+                    <div className="w-1.5 h-1.5 rounded-full bg-current" />{item}
+                    {item === 'Meetings' && <span className="ml-auto text-[7px] bg-red-500/15 text-red-500 px-1 rounded font-mono">1 live</span>}
                   </div>
                 ))}
               </div>
             </div>
-            {/* Board content */}
+            {/* Board */}
             <div className="flex-1 p-4 min-w-0 overflow-hidden">
               <div className="flex items-center gap-2 mb-3">
                 <span className="text-xs font-medium text-ink">Sprint 12 · Active</span>
@@ -806,6 +922,7 @@ export default function LandingPage() {
                   <div className="h-full bg-sage rounded-full" style={{ width: '62%' }} />
                 </div>
                 <span className="font-mono text-[9px] text-[#8A8F98]">62%</span>
+                <span className="font-mono text-[9px] bg-sage/10 text-sage px-2 py-0.5 rounded-full hidden sm:block">Health 87</span>
               </div>
               <InteractiveKanban />
               <p className="text-[9px] text-center text-[#8A8F98]/60 font-mono mt-2">↑ Drag cards between columns</p>
@@ -814,35 +931,35 @@ export default function LandingPage() {
         </motion.div>
       </section>
 
-      {/* ── Logo bar ──────────────────────────────────────────────────────── */}
+      {/* ── Logo bar ───────────────────────────────────────────────────────── */}
       <section className="border-y border-black/5 py-8 overflow-hidden">
         <div className="max-w-6xl mx-auto px-6">
           <p className="text-center text-xs text-[#8A8F98] font-mono uppercase tracking-widest mb-6">Used by engineering teams at</p>
           <div className="flex flex-wrap items-center justify-center gap-8 sm:gap-12">
-            {['Vertix', 'NordStack', 'Lumio', 'Archway', 'Stackr', 'Pulsar', 'Meridian'].map((name) => (
+            {['Vertix', 'NordStack', 'Lumio', 'Archway', 'Stackr', 'Pulsar', 'Meridian'].map(name => (
               <span key={name} className="font-semibold text-[#0F1115]/25 text-sm tracking-tight hover:text-[#0F1115]/50 transition-colors cursor-default select-none">{name}</span>
             ))}
           </div>
         </div>
       </section>
 
-      {/* ── Stats ────────────────────────────────────────────────────────── */}
+      {/* ── Stats ──────────────────────────────────────────────────────────── */}
       <section className="py-14">
         <div className="max-w-6xl mx-auto px-6 grid grid-cols-2 sm:grid-cols-4 gap-8">
-          <AnimatedStat value="18" suffix="+" label="Jira features built in" icon="⚡" />
-          <AnimatedStat value="4"        label="Project views" icon="📐" />
-          <AnimatedStat value="5"        label="Issue types" icon="🏷" />
+          <AnimatedStat value="30" suffix="+" label="Features built in" icon="⚡" />
+          <AnimatedStat value="6"        label="Collaboration tools" icon="🤝" />
+          <AnimatedStat value="5"        label="Project views" icon="📐" />
           <AnimatedStat value="100" suffix="%" label="Real-time sync" icon="🔄" />
         </div>
       </section>
 
-      {/* ── Features ─────────────────────────────────────────────────────── */}
+      {/* ── Features ───────────────────────────────────────────────────────── */}
       <section id="features" className="max-w-6xl mx-auto px-6 py-16">
         <div className="text-center mb-12">
           <p className="font-mono text-xs uppercase tracking-wider text-[#6E56CF] mb-3">Features</p>
-          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight mb-3">Everything your team needs.</h2>
+          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight mb-3">Everything your team needs — and more.</h2>
           <p className="text-sm sm:text-base text-[#8A8F98] max-w-lg mx-auto">
-            From sprint planning to roadmaps and reports — all the tools that make Jira essential, redesigned to be enjoyable.
+            From sprint planning to in-platform video meetings and AI-generated standups — tools that no other PM platform ships.
           </p>
         </div>
         <div className="grid sm:grid-cols-2 gap-5">
@@ -850,7 +967,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── How it works ─────────────────────────────────────────────────── */}
+      {/* ── How it works ───────────────────────────────────────────────────── */}
       <section id="how-it-works" className="bg-[#F1EFE7]/50 border-y border-black/5 py-20">
         <div className="max-w-6xl mx-auto px-6">
           <div className="text-center mb-14">
@@ -858,57 +975,28 @@ export default function LandingPage() {
             <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">Up and running in minutes.</h2>
           </div>
           <div className="grid sm:grid-cols-3 gap-6 relative">
-            {/* Connector line */}
             <div className="absolute top-10 left-1/6 right-1/6 h-px bg-gradient-to-r from-transparent via-black/10 to-transparent hidden sm:block" />
             {[
               {
-                step: '01',
-                title: 'Create your workspace',
-                body: 'Sign up in 30 seconds. Create your org, invite your team, and set up your first project — no config wizard, no IT ticket.',
-                icon: (
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                    <rect x="3" y="3" width="8" height="8" rx="2" fill={`${V}25`} stroke={V} strokeWidth="1.5" />
-                    <rect x="13" y="3" width="8" height="8" rx="2" fill={`${V}15`} stroke={V} strokeWidth="1.5" />
-                    <rect x="3" y="13" width="8" height="8" rx="2" fill={`${V}10`} stroke={V} strokeWidth="1.5" />
-                    <path d="M17 13v8M13 17h8" stroke={V} strokeWidth="1.5" strokeLinecap="round" />
-                  </svg>
-                ),
+                step: '01', title: 'Create your workspace',
+                body: 'Sign up in 30 seconds. Create your org, invite your team, and set up your first project — an interactive tour walks you through every feature.',
+                icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="8" height="8" rx="2" fill={`${V}25`} stroke={V} strokeWidth="1.5" /><rect x="13" y="3" width="8" height="8" rx="2" fill={`${V}15`} stroke={V} strokeWidth="1.5" /><rect x="3" y="13" width="8" height="8" rx="2" fill={`${V}10`} stroke={V} strokeWidth="1.5" /><path d="M17 13v8M13 17h8" stroke={V} strokeWidth="1.5" strokeLinecap="round" /></svg>,
               },
               {
-                step: '02',
-                title: 'Plan your sprints',
-                body: 'Create issues, organize the backlog, set sprint goals and dates. Drag issues into sprints. Hit Start Sprint and go.',
-                icon: (
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                    <rect x="3" y="4" width="18" height="2" rx="1" fill={V} opacity="0.9" />
-                    <rect x="3" y="9" width="14" height="2" rx="1" fill={V} opacity="0.6" />
-                    <rect x="3" y="14" width="10" height="2" rx="1" fill={V} opacity="0.4" />
-                    <path d="M18 13l3 3-3 3" stroke={SAGE} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                ),
+                step: '02', title: 'Plan and collaborate',
+                body: 'Create issues, organize the backlog, start sprints. Schedule meetings, join video rooms, and check in with Team Pulse — all in one tab.',
+                icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="2" rx="1" fill={V} opacity="0.9" /><rect x="3" y="9" width="14" height="2" rx="1" fill={V} opacity="0.6" /><rect x="3" y="14" width="10" height="2" rx="1" fill={V} opacity="0.4" /><path d="M18 13l3 3-3 3" stroke={SAGE} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>,
               },
               {
-                step: '03',
-                title: 'Ship and iterate',
-                body: 'Track progress on the board, spot blockers on the timeline, review velocity in reports, and plan the next sprint with real data.',
-                icon: (
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                    <path d="M3 17l5-5 4 4 9-10" stroke={SAGE} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                    <circle cx="20" cy="5" r="2" fill={SAGE} />
-                  </svg>
-                ),
+                step: '03', title: 'Ship and iterate',
+                body: 'Track progress on the board, use Focus Mode for deep work, generate your daily standup in one click, and review Sprint Health before things slip.',
+                icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M3 17l5-5 4 4 9-10" stroke={SAGE} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /><circle cx="20" cy="5" r="2" fill={SAGE} /></svg>,
               },
             ].map((step, i) => (
-              <motion.div key={i}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.1 }}
-                viewport={{ once: true }}
-                className="bg-white rounded-2xl p-6 border border-black/5 shadow-sm relative"
-              >
-                <div className="w-12 h-12 bg-[#F1EFE7] rounded-2xl flex items-center justify-center mb-4">
-                  {step.icon}
-                </div>
+              <motion.div key={i} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.1 }} viewport={{ once: true }}
+                className="bg-white rounded-2xl p-6 border border-black/5 shadow-sm relative">
+                <div className="w-12 h-12 bg-[#F1EFE7] rounded-2xl flex items-center justify-center mb-4">{step.icon}</div>
                 <span className="font-mono text-[10px] text-[#6E56CF] uppercase tracking-widest mb-2 block">{step.step}</span>
                 <h3 className="font-semibold text-ink mb-2">{step.title}</h3>
                 <p className="text-sm text-[#8A8F98] leading-relaxed">{step.body}</p>
@@ -918,13 +1006,13 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── Dark feature grid ─────────────────────────────────────────────── */}
+      {/* ── Dark feature grid ──────────────────────────────────────────────── */}
       <section className="max-w-6xl mx-auto px-6 py-16">
         <div className="bg-[#0F1115] rounded-3xl p-8 sm:p-12 text-white">
           <div className="flex items-start justify-between mb-10 flex-wrap gap-4">
             <div>
-              <p className="font-mono text-xs uppercase tracking-wider text-[#6E56CF] mb-2">And more</p>
-              <h2 className="text-xl sm:text-2xl font-bold">Every workflow. One place.</h2>
+              <p className="font-mono text-xs uppercase tracking-wider text-[#6E56CF] mb-2">Every workflow</p>
+              <h2 className="text-xl sm:text-2xl font-bold">One place. Nothing missing.</h2>
             </div>
             <Link to="/signup" className="text-sm bg-[#6E56CF] text-white rounded-full px-5 py-2.5 hover:bg-[#6E56CF]/90 transition-colors font-medium shrink-0">
               Start building free →
@@ -932,23 +1020,26 @@ export default function LandingPage() {
           </div>
           <div className="grid sm:grid-cols-3 gap-x-8 gap-y-7">
             {[
-              { icon: '⚡', title: 'Issue types', body: 'Epics, stories, tasks, bugs, and subtasks — each with the right fields and workflow.' },
-              { icon: '🔗', title: 'Issue linking', body: 'Block, duplicate, relate, or clone issues across the project.' },
-              { icon: '👁', title: 'Watchers', body: 'Subscribe to any issue and get notified on every update.' },
-              { icon: '⏱', title: 'Time tracking', body: 'Log time against issues and compare estimates to actuals.' },
-              { icon: '💬', title: 'Team chat', body: 'Per-project messaging so conversations live next to the work.' },
-              { icon: '🔔', title: 'Smart notifications', body: '@mention teammates, get assigned, comment — stay in the loop.' },
+              { icon: '⚡', title: 'Issue types',        body: 'Epics, stories, tasks, bugs, and subtasks — each with the right fields and workflow.' },
+              { icon: '🔗', title: 'Issue linking',       body: 'Block, duplicate, relate, or clone issues across the project.' },
+              { icon: '👁', title: 'Watchers',            body: 'Subscribe to any issue and get notified on every update.' },
+              { icon: '⏱', title: 'Time tracking',       body: 'Log time against issues and compare estimates to actuals — or let Focus Mode do it automatically.' },
+              { icon: '💬', title: 'Team chat',           body: 'Per-project messaging so conversations live next to the work.' },
+              { icon: '📹', title: 'Video rooms',         body: 'Built-in WebRTC video calls — no Zoom link, no plugins, no account needed.' },
+              { icon: '📝', title: 'Meeting notes',       body: 'Agenda, decisions, and action items — each one convertible to a task in one click.' },
+              { icon: '💛', title: 'Team Pulse',          body: 'Anonymous daily mood check-in with 7-day sparklines so managers can spot burnout early.' },
+              { icon: '🎯', title: 'Focus Mode',          body: 'Pomodoro timer built into every task. Start it — time logs automatically when the session ends.' },
+              { icon: '📢', title: 'Standup Generator',  body: 'One click writes your daily standup from real activity data. Copy to Slack or plain text.' },
+              { icon: '📊', title: 'Sprint Health Score', body: 'Predicts whether you\'ll finish the sprint on time. Updates live as work is completed.' },
+              { icon: '⌨️', title: 'Quick Breakdown',    body: 'Type one task per line and create all subtasks at once with ⌘↵. Keyboard-first, zero friction.' },
+              { icon: '🔔', title: 'Smart notifications', body: '@mention teammates, get assigned, comment — stay in the loop without the noise.' },
               { icon: '🏷', title: 'Labels & components', body: 'Organize issues with flexible labels and reusable components.' },
-              { icon: '📁', title: 'File attachments', body: 'Attach designs, screenshots, and specs to any issue. In context.' },
-              { icon: '⌘', title: 'Global search', body: 'Cmd+K search across all issues instantly, from anywhere in the app.' },
-              { icon: '🚀', title: 'Releases', body: 'Track fix versions, release progress, and ship notes per release.' },
-              { icon: '🎯', title: 'WIP limits', body: 'Set max issues per column. Stay focused, avoid context switching.' },
-              { icon: '📊', title: 'Velocity charts', body: 'See sprint-over-sprint velocity and burndown at a glance.' },
-            ].map((item) => (
-              <motion.div key={item.title}
-                whileHover={{ x: 2 }}
-                className="flex items-start gap-3"
-              >
+              { icon: '🚀', title: 'Releases',            body: 'Track fix versions, release progress, and ship notes per release.' },
+              { icon: '⌘', title: 'Global search',       body: 'Cmd+K search across all issues instantly, from anywhere in the app.' },
+              { icon: '📁', title: 'File attachments',    body: 'Attach designs, screenshots, and specs to any issue. In context.' },
+              { icon: '📊', title: 'Velocity charts',     body: 'See sprint-over-sprint velocity and burndown at a glance.' },
+            ].map(item => (
+              <motion.div key={item.title} whileHover={{ x: 2 }} className="flex items-start gap-3">
                 <span className="text-lg mt-0.5 shrink-0">{item.icon}</span>
                 <div>
                   <p className="font-semibold text-sm text-white mb-0.5">{item.title}</p>
@@ -960,46 +1051,41 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── Real-time section ────────────────────────────────────────────── */}
+      {/* ── Real-time section ──────────────────────────────────────────────── */}
       <section className="max-w-6xl mx-auto px-6 pb-16">
         <div className="grid sm:grid-cols-2 gap-10 items-center">
           <div>
             <p className="font-mono text-xs uppercase tracking-wider text-[#6E56CF] mb-3">Real-time</p>
             <h2 className="text-2xl sm:text-3xl font-bold tracking-tight mb-4">Built for teams<br className="hidden sm:block" /> who move fast.</h2>
             <p className="text-sm sm:text-base text-[#8A8F98] leading-relaxed mb-6">
-              Every change — moving a card, adding a comment, starting a sprint — is pushed to everyone instantly. No page reloads. No "did you see my update?" Slack messages.
+              Every change — moving a card, sending a chat message, joining a video room, logging focus time — is live for everyone. No page reloads. No "did you see my update?" Slack messages.
             </p>
             <ul className="space-y-3">
               {[
                 'Drag-and-drop board with live updates',
                 'Real-time sprint burndown tracking',
+                'In-platform WebRTC video rooms',
                 'Instant @mention notifications',
                 'Live team chat alongside your board',
+                'Focus Mode auto-logs time to tasks',
                 'Activity feed updates without refresh',
               ].map((item, i) => (
-                <motion.li key={item}
-                  initial={{ opacity: 0, x: -8 }}
-                  whileInView={{ opacity: 1, x: 0 }}
-                  transition={{ delay: i * 0.07 }}
-                  viewport={{ once: true }}
-                  className="flex items-center gap-2.5 text-sm text-ink"
-                >
+                <motion.li key={item} initial={{ opacity: 0, x: -8 }} whileInView={{ opacity: 1, x: 0 }}
+                  transition={{ delay: i * 0.07 }} viewport={{ once: true }}
+                  className="flex items-center gap-2.5 text-sm text-ink">
                   <div className="w-4 h-4 rounded-full bg-violet/10 flex items-center justify-center shrink-0">
-                    <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
-                      <path d="M1 4l2.5 2.5L7 1.5" stroke={V} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
+                    <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M1 4l2.5 2.5L7 1.5" stroke={V} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
                   </div>
                   {item}
                 </motion.li>
               ))}
             </ul>
           </div>
-          {/* Animated activity feed */}
           <LiveActivityFeed />
         </div>
       </section>
 
-      {/* ── Testimonials ─────────────────────────────────────────────────── */}
+      {/* ── Testimonials ───────────────────────────────────────────────────── */}
       <section className="border-t border-black/5 bg-white py-20">
         <div className="max-w-6xl mx-auto px-6">
           <div className="text-center mb-12">
@@ -1008,25 +1094,15 @@ export default function LandingPage() {
           </div>
           <div className="grid sm:grid-cols-3 gap-5">
             {TESTIMONIALS.map((t, i) => (
-              <motion.div key={i}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.1 }}
-                viewport={{ once: true }}
-                whileHover={{ y: -3 }}
-                className="bg-[#FAFAF7] rounded-2xl p-6 border border-black/5 shadow-sm cursor-default"
-              >
-                {/* Stars */}
+              <motion.div key={i} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.1 }} viewport={{ once: true }} whileHover={{ y: -3 }}
+                className="bg-[#FAFAF7] rounded-2xl p-6 border border-black/5 shadow-sm cursor-default">
                 <div className="flex gap-0.5 mb-4">
-                  {[1,2,3,4,5].map(s => (
-                    <svg key={s} width="12" height="12" viewBox="0 0 12 12" fill="#F59E0B"><path d="M6 1l1.2 3.7H11L8.1 6.9l1 3.6L6 8.7 2.9 10.5l1-3.6L1 4.7h3.8z" /></svg>
-                  ))}
+                  {[1,2,3,4,5].map(s => <svg key={s} width="12" height="12" viewBox="0 0 12 12" fill="#F59E0B"><path d="M6 1l1.2 3.7H11L8.1 6.9l1 3.6L6 8.7 2.9 10.5l1-3.6L1 4.7h3.8z" /></svg>)}
                 </div>
                 <p className="text-sm text-[#0F1115] leading-relaxed mb-5">"{t.quote}"</p>
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0" style={{ backgroundColor: t.color }}>
-                    {t.author[0]}
-                  </div>
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0" style={{ backgroundColor: t.color }}>{t.author[0]}</div>
                   <div>
                     <p className="text-xs font-semibold text-ink">{t.author}</p>
                     <p className="text-[10px] text-[#8A8F98]">{t.title}</p>
@@ -1038,23 +1114,19 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── Pricing ──────────────────────────────────────────────────────── */}
+      {/* ── Pricing ────────────────────────────────────────────────────────── */}
       <section id="pricing" className="border-t border-black/5 py-20">
         <div className="max-w-6xl mx-auto px-6">
           <div className="text-center mb-10">
             <p className="font-mono text-xs uppercase tracking-wider text-[#6E56CF] mb-3">Pricing</p>
             <h2 className="text-2xl sm:text-3xl font-bold tracking-tight mb-3">Simple, honest pricing.</h2>
             <p className="text-sm text-[#8A8F98] mb-6">Per workspace. Not per seat. Scale your team, not your bill.</p>
-            {/* Billing toggle */}
             <div className="inline-flex items-center gap-3 bg-[#F1EFE7] rounded-full p-1">
               <button onClick={() => setAnnual(false)}
-                className={`text-xs px-4 py-2 rounded-full transition-all ${!annual ? 'bg-white text-ink font-medium shadow-sm' : 'text-[#8A8F98]'}`}
-              >Monthly</button>
+                className={`text-xs px-4 py-2 rounded-full transition-all ${!annual ? 'bg-white text-ink font-medium shadow-sm' : 'text-[#8A8F98]'}`}>Monthly</button>
               <button onClick={() => setAnnual(true)}
-                className={`text-xs px-4 py-2 rounded-full transition-all flex items-center gap-1.5 ${annual ? 'bg-white text-ink font-medium shadow-sm' : 'text-[#8A8F98]'}`}
-              >
-                Annual
-                <span className="bg-sage/20 text-sage font-mono text-[9px] px-1.5 py-0.5 rounded-full">–20%</span>
+                className={`text-xs px-4 py-2 rounded-full transition-all flex items-center gap-1.5 ${annual ? 'bg-white text-ink font-medium shadow-sm' : 'text-[#8A8F98]'}`}>
+                Annual <span className="bg-sage/20 text-sage font-mono text-[9px] px-1.5 py-0.5 rounded-full">–20%</span>
               </button>
             </div>
           </div>
@@ -1064,13 +1136,13 @@ export default function LandingPage() {
               {
                 name: 'Free', price: 0, annualPrice: 0, sub: 'Forever, no card needed',
                 color: MUTED, cta: 'Start free', ctaClass: 'border border-black/10 hover:bg-black/[0.03]',
-                features: ['1 project', '3 team members', 'Kanban board', 'Sprint backlog', 'Activity feed'],
+                features: ['1 project', '3 team members', 'Kanban board', 'Sprint backlog', 'Team chat', 'Video rooms'],
                 check: '#36D399',
               },
               {
                 name: 'Pro', price: 10, annualPrice: 8, sub: 'Per workspace · billed monthly',
                 color: V, cta: 'Start with Pro', ctaClass: 'bg-[#6E56CF] text-white hover:bg-[#6E56CF]/90', popular: true,
-                features: ['5 projects', '10 members per project', 'Timeline & Reports', 'Sprint management', 'Team chat', 'Releases', 'Keyboard shortcuts'],
+                features: ['5 projects', '10 members', 'Timeline & Reports', 'Sprint management', 'Meetings & video rooms', 'Focus Mode', 'Standup Generator', 'Sprint Health Score'],
                 check: V,
               },
               {
@@ -1079,11 +1151,9 @@ export default function LandingPage() {
                 features: ['Unlimited projects', 'Unlimited members', 'File uploads', 'Priority support', 'Everything in Pro'],
                 check: SAGE,
               },
-            ].map((plan) => (
-              <motion.div key={plan.name}
-                whileHover={{ y: -3 }}
-                className={`rounded-2xl p-6 bg-white relative transition-shadow ${plan.popular ? 'border-2 border-[#6E56CF] shadow-lg shadow-violet-500/10' : 'border border-black/10 shadow-sm hover:shadow-md'}`}
-              >
+            ].map(plan => (
+              <motion.div key={plan.name} whileHover={{ y: -3 }}
+                className={`rounded-2xl p-6 bg-white relative transition-shadow ${plan.popular ? 'border-2 border-[#6E56CF] shadow-lg shadow-violet-500/10' : 'border border-black/10 shadow-sm hover:shadow-md'}`}>
                 {plan.popular && (
                   <span className="absolute -top-3 left-6 bg-[#6E56CF] text-white text-[10px] font-mono uppercase tracking-wide px-2.5 py-1 rounded-full">Most popular</span>
                 )}
@@ -1091,27 +1161,21 @@ export default function LandingPage() {
                 <div className="flex items-end gap-1 mb-1">
                   <AnimatePresence mode="wait">
                     <motion.p key={annual ? 'a' : 'm'} initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 8 }}
-                      className="text-3xl font-bold"
-                    >
-                      ${annual ? plan.annualPrice : plan.price}
-                    </motion.p>
+                      className="text-3xl font-bold">${annual ? plan.annualPrice : plan.price}</motion.p>
                   </AnimatePresence>
                   {plan.price > 0 && <span className="text-sm text-[#8A8F98] mb-1">/mo</span>}
                 </div>
                 <p className="text-xs text-[#8A8F98] mb-5">{plan.sub}</p>
                 <ul className="text-sm text-[#8A8F98] space-y-2 mb-6">
-                  {plan.features.map((f) => (
+                  {plan.features.map(f => (
                     <li key={f} className="flex items-center gap-2">
                       <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                        <path d="M2 6l3 3 5-5" stroke={plan.check} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
+                        <path d="M2 6l3 3 5-5" stroke={plan.check} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
                       {f}
                     </li>
                   ))}
                 </ul>
-                <Link to="/signup" className={`block text-center text-sm rounded-full py-2.5 transition-colors font-medium ${plan.ctaClass}`}>
-                  {plan.cta}
-                </Link>
+                <Link to="/signup" className={`block text-center text-sm rounded-full py-2.5 transition-colors font-medium ${plan.ctaClass}`}>{plan.cta}</Link>
               </motion.div>
             ))}
           </div>
@@ -1119,7 +1183,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── FAQ ──────────────────────────────────────────────────────────── */}
+      {/* ── FAQ ────────────────────────────────────────────────────────────── */}
       <section className="border-t border-black/5 py-20">
         <div className="max-w-2xl mx-auto px-6">
           <div className="text-center mb-12">
@@ -1132,7 +1196,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── Contact ──────────────────────────────────────────────────────── */}
+      {/* ── Contact ────────────────────────────────────────────────────────── */}
       <section id="contact" className="border-t border-black/5 py-20">
         <div className="max-w-6xl mx-auto px-6">
           <div className="grid sm:grid-cols-2 gap-12 items-start">
@@ -1144,10 +1208,10 @@ export default function LandingPage() {
               </p>
               <div className="space-y-5">
                 {[
-                  { icon: '✉️', label: 'Email us', value: 'hello@tasklane.app' },
-                  { icon: '🕐', label: 'Response time', value: 'Within 24 hours' },
-                  { icon: '💼', label: 'Enterprise', value: 'Custom plans available' },
-                ].map((item) => (
+                  { icon: '✉️', label: 'Email us',       value: 'hello@tasklane.app' },
+                  { icon: '🕐', label: 'Response time',  value: 'Within 24 hours' },
+                  { icon: '💼', label: 'Enterprise',     value: 'Custom plans available' },
+                ].map(item => (
                   <div key={item.label} className="flex items-start gap-3">
                     <span className="text-xl">{item.icon}</span>
                     <div>
@@ -1165,32 +1229,25 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── Final CTA ────────────────────────────────────────────────────── */}
+      {/* ── Final CTA ──────────────────────────────────────────────────────── */}
       <section className="max-w-6xl mx-auto px-6 py-16">
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          viewport={{ once: true }}
-          className="text-center bg-[#0F1115] rounded-3xl px-8 py-16 text-white relative overflow-hidden"
-        >
+        <motion.div initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }} viewport={{ once: true }}
+          className="text-center bg-[#0F1115] rounded-3xl px-8 py-16 text-white relative overflow-hidden">
           <div className="absolute inset-0 opacity-20 pointer-events-none"
             style={{ backgroundImage: `radial-gradient(${V} 1px, transparent 1px)`, backgroundSize: '32px 32px' }} />
           <div className="relative">
             <p className="font-mono text-xs uppercase tracking-wider text-[#6E56CF] mb-3">Get started</p>
             <h2 className="text-2xl sm:text-4xl font-bold mb-4">Ship more. Stress less.</h2>
             <p className="text-sm text-white/50 mb-8 max-w-md mx-auto">
-              Join engineering teams who replaced spreadsheets and over-engineered tools with something that just works.
+              Boards, video meetings, Focus Mode, Standup Generator, Sprint Health — everything your team needs, in one beautifully designed workspace.
             </p>
             <div className="flex flex-wrap items-center justify-center gap-3">
               <Link to="/signup"
-                className="inline-block bg-[#6E56CF] text-white rounded-full px-8 py-3 text-sm font-medium hover:bg-[#6E56CF]/90 transition-all hover:-translate-y-0.5 shadow-lg shadow-violet-500/30"
-              >
+                className="inline-block bg-[#6E56CF] text-white rounded-full px-8 py-3 text-sm font-medium hover:bg-[#6E56CF]/90 transition-all hover:-translate-y-0.5 shadow-lg shadow-violet-500/30">
                 Start building for free →
               </Link>
-              <a href="#contact"
-                className="inline-block border border-white/20 text-white/80 rounded-full px-8 py-3 text-sm hover:bg-white/10 transition-colors"
-              >
+              <a href="#contact" className="inline-block border border-white/20 text-white/80 rounded-full px-8 py-3 text-sm hover:bg-white/10 transition-colors">
                 Talk to us
               </a>
             </div>
@@ -1199,50 +1256,33 @@ export default function LandingPage() {
         </motion.div>
       </section>
 
-      {/* ── Footer ───────────────────────────────────────────────────────── */}
+      {/* ── Footer ─────────────────────────────────────────────────────────── */}
       <footer className="border-t border-black/5 bg-white py-14">
         <div className="max-w-6xl mx-auto px-6">
           <div className="grid sm:grid-cols-5 gap-10 mb-12">
-            {/* Brand */}
             <div className="sm:col-span-2">
               <div className="flex items-center gap-2 mb-3">
-                <div className="w-6 h-6 bg-[#0F1115] rounded-md flex items-center justify-center">
-                  <div className="w-2.5 h-2.5 bg-[#6E56CF] rounded-sm" />
-                </div>
+                <div className="w-6 h-6 bg-[#0F1115] rounded-md flex items-center justify-center"><div className="w-2.5 h-2.5 bg-[#6E56CF] rounded-sm" /></div>
                 <span className="font-semibold">Tasklane</span>
               </div>
               <p className="text-xs text-[#8A8F98] leading-relaxed max-w-xs">
-                Project management built for modern engineering teams. Jira-powerful. Notion-beautiful.
+                Project management built for modern engineering teams — with video meetings, Focus Mode, and smart tools no other PM platform ships.
               </p>
               <div className="flex gap-3 mt-5">
-                {['Twitter', 'GitHub', 'LinkedIn'].map((s) => (
+                {['Twitter', 'GitHub', 'LinkedIn'].map(s => (
                   <a key={s} href="#" className="text-[10px] text-[#8A8F98] hover:text-ink transition-colors">{s}</a>
                 ))}
               </div>
             </div>
-            {/* Links */}
             {[
-              {
-                title: 'Product',
-                links: ['Features', 'Pricing', 'Changelog', 'Roadmap', 'Status'],
-              },
-              {
-                title: 'Compare',
-                links: ['vs Jira', 'vs Linear', 'vs Asana', 'vs Trello', 'vs Notion'],
-              },
-              {
-                title: 'Company',
-                links: ['About', 'Blog', 'Careers', 'Press', 'Contact'],
-              },
-            ].map((col) => (
+              { title: 'Product',  links: ['Features', 'Pricing', 'Changelog', 'Roadmap', 'Status'] },
+              { title: 'Compare',  links: ['vs Jira', 'vs Linear', 'vs Asana', 'vs Trello', 'vs Notion'] },
+              { title: 'Company',  links: ['About', 'Blog', 'Careers', 'Press', 'Contact'] },
+            ].map(col => (
               <div key={col.title}>
                 <p className="font-mono text-[10px] uppercase tracking-wider text-[#8A8F98] mb-3">{col.title}</p>
                 <ul className="space-y-2">
-                  {col.links.map((link) => (
-                    <li key={link}>
-                      <a href="#" className="text-xs text-[#8A8F98] hover:text-ink transition-colors">{link}</a>
-                    </li>
-                  ))}
+                  {col.links.map(link => <li key={link}><a href="#" className="text-xs text-[#8A8F98] hover:text-ink transition-colors">{link}</a></li>)}
                 </ul>
               </div>
             ))}
@@ -1250,69 +1290,13 @@ export default function LandingPage() {
           <div className="border-t border-black/5 pt-6 flex flex-col sm:flex-row items-center justify-between gap-3">
             <span className="text-xs text-[#8A8F98]">© {new Date().getFullYear()} Tasklane. All rights reserved.</span>
             <div className="flex gap-4">
-              {['Privacy policy', 'Terms of service', 'Cookie settings'].map((l) => (
+              {['Privacy policy', 'Terms of service', 'Cookie settings'].map(l => (
                 <a key={l} href="#" className="text-xs text-[#8A8F98] hover:text-ink transition-colors">{l}</a>
               ))}
             </div>
           </div>
         </div>
       </footer>
-    </div>
-  )
-}
-
-// ─── Live activity feed (extracted for clarity) ────────────────────────────
-
-function LiveActivityFeed() {
-  const ACTIVITIES = [
-    { user: 'Priya',  action: 'moved "Fix auth bug" to In Review',    time: '2s ago',  color: V },
-    { user: 'Daniel', action: 'started Sprint 12',                     time: '1m ago',  color: SAGE },
-    { user: 'Sara',   action: 'commented on "Dashboard redesign"',     time: '4m ago',  color: '#F59E0B' },
-    { user: 'Alex',   action: 'assigned "API v3" to themselves',       time: '9m ago',  color: '#3B82F6' },
-    { user: 'Mia',    action: 'logged 2h on "Mobile sync"',            time: '12m ago', color: '#8B5CF6' },
-    { user: 'James',  action: 'created epic "Q4 Redesign"',            time: '18m ago', color: '#EF4444' },
-  ]
-
-  const [highlighted, setHighlighted] = useState(0)
-
-  useEffect(() => {
-    const t = setInterval(() => setHighlighted(i => (i + 1) % ACTIVITIES.length), 2200)
-    return () => clearInterval(t)
-  }, [])
-
-  return (
-    <div className="bg-white rounded-2xl border border-black/8 p-5 shadow-sm space-y-2.5">
-      <div className="flex items-center gap-2 mb-4">
-        <div className="w-1.5 h-1.5 rounded-full bg-sage animate-pulse" />
-        <p className="font-mono text-[10px] uppercase tracking-wider text-[#8A8F98]">Live activity</p>
-      </div>
-      {ACTIVITIES.map((item, i) => (
-        <motion.div
-          key={i}
-          initial={{ opacity: 0, x: 10 }}
-          whileInView={{ opacity: 1, x: 0 }}
-          transition={{ delay: i * 0.07 }}
-          viewport={{ once: true }}
-          animate={{ backgroundColor: highlighted === i ? '#6E56CF08' : '#ffffff' }}
-          className="flex items-start gap-3 rounded-xl px-2 py-1.5 transition-colors"
-        >
-          <div className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[9px] font-bold shrink-0 mt-0.5"
-            style={{ backgroundColor: item.color }}>
-            {item.user[0]}
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-xs text-ink">
-              <span className="font-semibold">{item.user}</span>{' '}
-              <span className="text-[#8A8F98]">{item.action}</span>
-            </p>
-            <p className="font-mono text-[9px] text-[#8A8F98] mt-0.5">{item.time}</p>
-          </div>
-          {highlighted === i && (
-            <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }}
-              className="w-1.5 h-1.5 rounded-full bg-sage mt-1.5 shrink-0" />
-          )}
-        </motion.div>
-      ))}
     </div>
   )
 }
