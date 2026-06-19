@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '../lib/AuthContext'
 import {
@@ -166,6 +166,7 @@ function formatTime12(t) {
 
 // ── Meeting Detail Panel ─────────────────────────────────────────
 function MeetingDetail({ meeting, members, projectId, currentUserId, onClose, onUpdated, onDeleted }) {
+  const navigate = useNavigate()
   const { user } = useAuth()
   const [notes,      setNotes]      = useState(meeting.notes      || '')
   const [decisions,  setDecisions]  = useState(meeting.decisions  || '')
@@ -290,21 +291,32 @@ function MeetingDetail({ meeting, members, projectId, currentUserId, onClose, on
             </div>
 
             <div className="flex items-center gap-2 shrink-0">
-              {/* Join Meeting button — only for host and attendees */}
-              {canJoin && (
-                <motion.a
-                  href={meetingUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
+              {/* Start / Join room — host and attendees only */}
+              {(isHost || isAttendee) && (
+                <motion.button
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.97 }}
+                  onClick={() => navigate(`/projects/${projectId}/meetings/${meeting.id}/room`)}
                   className="flex items-center gap-1.5 text-xs bg-violet text-white px-3 py-1.5 rounded-xl font-medium hover:bg-violet/90 transition-colors"
                 >
                   <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
-                    <path d="M1 5.5h8M6 2.5l3 3-3 3" stroke="white" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+                    <rect x="1" y="2.5" width="7" height="6" rx="1" fill="white" />
+                    <path d="M8 4.5l2.5-1.5v5L8 6.5V4.5z" fill="white" opacity="0.7" />
                   </svg>
-                  Join
-                </motion.a>
+                  {isHost ? 'Start Room' : 'Join Room'}
+                </motion.button>
+              )}
+              {/* External link (secondary) */}
+              {canJoin && (
+                <a
+                  href={meetingUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[10px] text-slate-muted hover:text-ink transition-colors underline underline-offset-2"
+                  title="Open external meeting link"
+                >
+                  External ↗
+                </a>
               )}
               {isHost && (
                 <button onClick={handleDelete} className="p-1.5 text-slate-muted hover:text-red-500 transition-colors rounded-lg hover:bg-red-50">
@@ -455,6 +467,7 @@ function MeetingDetail({ meeting, members, projectId, currentUserId, onClose, on
 // ── Main Meetings Page ───────────────────────────────────────────
 export default function Meetings() {
   const { projectId } = useParams()
+  const navigate = useNavigate()
   const { user } = useAuth()
   const [meetings,    setMeetings]    = useState([])
   const [members,     setMembers]     = useState([])
@@ -581,7 +594,7 @@ export default function Meetings() {
                       )}
                     </div>
 
-                    <div className="shrink-0 text-right">
+                    <div className="shrink-0 text-right flex flex-col items-end gap-2">
                       {total > 0 && (
                         <div className="flex items-center gap-1.5 justify-end">
                           <div className="h-1.5 w-16 bg-black/6 rounded-full overflow-hidden">
@@ -590,9 +603,20 @@ export default function Meetings() {
                           <span className="font-mono text-[9px] text-slate-muted">{done}/{total}</span>
                         </div>
                       )}
-                      <p className="text-[10px] text-slate-muted mt-1">
+                      <p className="text-[10px] text-slate-muted">
                         {fmtDate(m.date)}{m.meeting_time ? ` · ${formatTime12(m.meeting_time)}` : ''}
                       </p>
+                      <motion.button
+                        whileTap={{ scale: 0.95 }}
+                        onClick={e => { e.stopPropagation(); navigate(`/projects/${projectId}/meetings/${m.id}/room`) }}
+                        className="flex items-center gap-1 text-[10px] font-medium text-violet border border-violet/25 hover:bg-violet hover:text-white hover:border-violet px-2.5 py-1 rounded-lg transition-all"
+                      >
+                        <svg width="9" height="9" viewBox="0 0 9 9" fill="none">
+                          <rect x="0.5" y="2" width="5.5" height="5" rx="1" fill="currentColor" />
+                          <path d="M6 3.5l2.5-1.5v5L6 5.5V3.5z" fill="currentColor" opacity="0.7" />
+                        </svg>
+                        Join Room
+                      </motion.button>
                     </div>
                   </div>
                 </motion.button>
