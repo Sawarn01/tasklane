@@ -3,9 +3,9 @@ import { useParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '../lib/AuthContext'
 import {
-  getMeetings, createMeeting, updateMeeting, deleteMeeting,
+  getMeetings, getProject, createMeeting, updateMeeting, deleteMeeting,
   getMeetingActionItems, createActionItem, toggleActionItem, actionItemToTask,
-  getProjectMembers,
+  getProjectMembers, sendMeetingInvites,
 } from '../lib/data'
 
 const EMOJI = { '😴': 1, '😕': 2, '😐': 3, '🙂': 4, '🚀': 5 }
@@ -30,17 +30,20 @@ function Avatar({ name, size = 7 }) {
 
 // ── New Meeting Modal ────────────────────────────────────────────
 function NewMeetingModal({ members, onClose, onCreate }) {
-  const [title, setTitle]   = useState('')
-  const [date, setDate]     = useState(new Date().toISOString().slice(0, 10))
-  const [agenda, setAgenda] = useState('')
-  const [attendees, setAttendees] = useState([])
-  const [saving, setSaving] = useState(false)
+  const [title,      setTitle]      = useState('')
+  const [date,       setDate]       = useState(new Date().toISOString().slice(0, 10))
+  const [time,       setTime]       = useState('')
+  const [agenda,     setAgenda]     = useState('')
+  const [meetingUrl, setMeetingUrl] = useState('')
+  const [attendees,  setAttendees]  = useState([])
+  const [saving,     setSaving]     = useState(false)
 
   async function submit() {
     if (!title.trim()) return
     setSaving(true)
-    try { await onCreate({ title: title.trim(), date, agenda, attendeeIds: attendees }) }
-    finally { setSaving(false) }
+    try {
+      await onCreate({ title: title.trim(), date, time, agenda, meetingUrl, attendeeIds: attendees })
+    } finally { setSaving(false) }
   }
 
   return (
@@ -51,8 +54,8 @@ function NewMeetingModal({ members, onClose, onCreate }) {
         exit={{ opacity: 0, scale: 0.96, y: 16 }} transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
         className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none"
       >
-        <div className="bg-white rounded-2xl shadow-2xl border border-black/5 w-full max-w-md pointer-events-auto">
-          <div className="px-5 pt-5 pb-4 border-b border-black/5 flex items-center justify-between">
+        <div className="bg-white rounded-2xl shadow-2xl border border-black/5 w-full max-w-md pointer-events-auto max-h-[90vh] overflow-y-auto">
+          <div className="px-5 pt-5 pb-4 border-b border-black/5 flex items-center justify-between sticky top-0 bg-white z-10">
             <h3 className="font-bold text-ink text-sm">New Meeting</h3>
             <button onClick={onClose} className="text-slate-muted hover:text-ink transition-colors">
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 2l10 10M12 2L2 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>
@@ -68,11 +71,38 @@ function NewMeetingModal({ members, onClose, onCreate }) {
               />
             </div>
 
+            {/* Date + Time row */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[10px] font-mono uppercase tracking-wider text-slate-muted mb-1.5">Date</label>
+                <input type="date" value={date} onChange={e => setDate(e.target.value)}
+                  className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm text-ink focus:outline-none focus:border-violet/40 transition-colors"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-mono uppercase tracking-wider text-slate-muted mb-1.5">Time (optional)</label>
+                <input type="time" value={time} onChange={e => setTime(e.target.value)}
+                  className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm text-ink focus:outline-none focus:border-violet/40 transition-colors"
+                />
+              </div>
+            </div>
+
+            {/* Meeting URL */}
             <div>
-              <label className="block text-[10px] font-mono uppercase tracking-wider text-slate-muted mb-1.5">Date</label>
-              <input type="date" value={date} onChange={e => setDate(e.target.value)}
-                className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm text-ink focus:outline-none focus:border-violet/40 transition-colors"
-              />
+              <label className="block text-[10px] font-mono uppercase tracking-wider text-slate-muted mb-1.5">
+                Meeting link (optional)
+              </label>
+              <div className="relative">
+                <svg width="13" height="13" viewBox="0 0 13 13" fill="none"
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-muted">
+                  <path d="M5 8.5l3-3M8.5 3.5A2.5 2.5 0 1 1 12 7l-1.5 1.5M5 9.5A2.5 2.5 0 1 1 1 6l1.5-1.5"
+                    stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+                </svg>
+                <input value={meetingUrl} onChange={e => setMeetingUrl(e.target.value)}
+                  placeholder="https://meet.google.com/… or Zoom link"
+                  className="w-full border border-black/10 rounded-xl pl-8 pr-3 py-2 text-sm text-ink placeholder:text-slate-muted focus:outline-none focus:border-violet/40 transition-colors"
+                />
+              </div>
             </div>
 
             <div>
@@ -85,7 +115,14 @@ function NewMeetingModal({ members, onClose, onCreate }) {
 
             {members.length > 0 && (
               <div>
-                <label className="block text-[10px] font-mono uppercase tracking-wider text-slate-muted mb-2">Attendees</label>
+                <label className="block text-[10px] font-mono uppercase tracking-wider text-slate-muted mb-2">
+                  Attendees
+                  {attendees.length > 0 && (
+                    <span className="ml-2 text-violet normal-case font-normal">
+                      — invite email will be sent to {attendees.length} person{attendees.length !== 1 ? 's' : ''}
+                    </span>
+                  )}
+                </label>
                 <div className="flex flex-wrap gap-2">
                   {members.map(m => {
                     const selected = attendees.includes(m.id)
@@ -110,7 +147,7 @@ function NewMeetingModal({ members, onClose, onCreate }) {
             <button onClick={onClose} className="flex-1 text-sm border border-black/10 rounded-xl py-2.5 text-slate-muted hover:text-ink transition-colors">Cancel</button>
             <motion.button whileTap={{ scale: 0.97 }} onClick={submit} disabled={!title.trim() || saving}
               className="flex-1 text-sm bg-violet text-white rounded-xl py-2.5 font-medium hover:bg-violet/90 disabled:opacity-50 transition-colors">
-              {saving ? 'Creating…' : 'Create meeting'}
+              {saving ? 'Creating…' : 'Create & invite'}
             </motion.button>
           </div>
         </div>
@@ -119,17 +156,29 @@ function NewMeetingModal({ members, onClose, onCreate }) {
   )
 }
 
+function formatTime12(t) {
+  if (!t) return ''
+  const [hStr, mStr] = t.split(':')
+  const h = Number(hStr), m = Number(mStr)
+  const ampm = h >= 12 ? 'PM' : 'AM'
+  return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${ampm}`
+}
+
 // ── Meeting Detail Panel ─────────────────────────────────────────
-function MeetingDetail({ meeting, members, projectId, onClose, onUpdated, onDeleted }) {
+function MeetingDetail({ meeting, members, projectId, currentUserId, onClose, onUpdated, onDeleted }) {
   const { user } = useAuth()
-  const [notes,     setNotes]     = useState(meeting.notes     || '')
-  const [decisions, setDecisions] = useState(meeting.decisions || '')
+  const [notes,      setNotes]      = useState(meeting.notes      || '')
+  const [decisions,  setDecisions]  = useState(meeting.decisions  || '')
+  const [meetingUrl, setMeetingUrl] = useState(meeting.meeting_url || '')
+  const [meetingTime, setMeetingTime] = useState(
+    meeting.meeting_time ? meeting.meeting_time.slice(0, 5) : ''
+  )
   const [items,     setItems]     = useState([])
   const [newItem,   setNewItem]   = useState('')
   const [newAssignee, setNewAssignee] = useState('')
-  const [saving,    setSaving]    = useState(false)
   const [converting, setConverting] = useState(null)
   const notesDebounce = useRef(null)
+  const urlDebounce   = useRef(null)
 
   useEffect(() => {
     getMeetingActionItems(meeting.id).then(setItems)
@@ -142,6 +191,24 @@ function MeetingDetail({ meeting, members, projectId, onClose, onUpdated, onDele
       onUpdated?.({ ...meeting, [field]: val })
     }, 800)
   }
+
+  function autoSaveUrl(val) {
+    clearTimeout(urlDebounce.current)
+    urlDebounce.current = setTimeout(() => {
+      updateMeeting({ meetingId: meeting.id, meetingUrl: val }).catch(() => {})
+      onUpdated?.({ ...meeting, meeting_url: val })
+    }, 800)
+  }
+
+  function autoSaveTime(val) {
+    updateMeeting({ meetingId: meeting.id, time: val || null }).catch(() => {})
+    onUpdated?.({ ...meeting, meeting_time: val || null })
+  }
+
+  // Determine if current user can see Join button
+  const isHost     = meeting.created_by === currentUserId
+  const isAttendee = (meeting.attendee_ids || []).includes(currentUserId)
+  const canJoin    = (isHost || isAttendee) && meetingUrl
 
   async function addItem() {
     if (!newItem.trim()) return
@@ -190,10 +257,28 @@ function MeetingDetail({ meeting, members, projectId, onClose, onUpdated, onDele
         <div className="px-6 pt-5 pb-4 border-b border-black/5 shrink-0">
           <div className="flex items-start gap-3">
             <div className="flex-1 min-w-0">
-              <p className="font-mono text-[10px] uppercase tracking-wider text-slate-muted mb-1">{fmtDate(meeting.date)}</p>
+              {/* Date + Time */}
+              <div className="flex items-center gap-3 mb-1 flex-wrap">
+                <p className="font-mono text-[10px] uppercase tracking-wider text-slate-muted">{fmtDate(meeting.date)}</p>
+                {/* Editable time */}
+                <div className="flex items-center gap-1.5">
+                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none" className="text-slate-muted shrink-0">
+                    <circle cx="5" cy="5" r="4" stroke="currentColor" strokeWidth="1.2" />
+                    <path d="M5 3v2l1.5 1.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+                  </svg>
+                  <input
+                    type="time" value={meetingTime}
+                    onChange={e => { setMeetingTime(e.target.value); autoSaveTime(e.target.value) }}
+                    className="text-[10px] font-mono text-slate-muted bg-transparent border-none outline-none cursor-pointer hover:text-ink transition-colors w-24"
+                  />
+                </div>
+              </div>
+
               <h2 className="font-bold text-ink text-base leading-tight">{meeting.title}</h2>
+
               {attendeeNames.length > 0 && (
                 <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                  {isHost && <span className="text-[9px] font-mono uppercase text-violet tracking-wide">Host</span>}
                   {attendeeNames.map(n => (
                     <span key={n} className="flex items-center gap-1 text-[10px] bg-paper-dim px-2 py-0.5 rounded-full text-slate-muted">
                       <Avatar name={n} size={4} />
@@ -203,12 +288,31 @@ function MeetingDetail({ meeting, members, projectId, onClose, onUpdated, onDele
                 </div>
               )}
             </div>
+
             <div className="flex items-center gap-2 shrink-0">
-              <button onClick={handleDelete} className="p-1.5 text-slate-muted hover:text-red-500 transition-colors rounded-lg hover:bg-red-50">
-                <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-                  <path d="M2 3.5h9M5 3.5V2.5h3v1M4.5 3.5l.5 7h3l.5-7" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </button>
+              {/* Join Meeting button — only for host and attendees */}
+              {canJoin && (
+                <motion.a
+                  href={meetingUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.97 }}
+                  className="flex items-center gap-1.5 text-xs bg-violet text-white px-3 py-1.5 rounded-xl font-medium hover:bg-violet/90 transition-colors"
+                >
+                  <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
+                    <path d="M1 5.5h8M6 2.5l3 3-3 3" stroke="white" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                  Join
+                </motion.a>
+              )}
+              {isHost && (
+                <button onClick={handleDelete} className="p-1.5 text-slate-muted hover:text-red-500 transition-colors rounded-lg hover:bg-red-50">
+                  <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                    <path d="M2 3.5h9M5 3.5V2.5h3v1M4.5 3.5l.5 7h3l.5-7" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+              )}
               <button onClick={onClose} className="p-1.5 text-slate-muted hover:text-ink transition-colors">
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 2l10 10M12 2L2 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>
               </button>
@@ -224,6 +328,29 @@ function MeetingDetail({ meeting, members, projectId, onClose, onUpdated, onDele
               <p className="text-sm text-ink whitespace-pre-wrap leading-relaxed bg-paper-dim rounded-xl p-3">{meeting.agenda}</p>
             </div>
           )}
+
+          {/* Meeting link */}
+          <div>
+            <p className="font-mono text-[10px] uppercase tracking-wider text-slate-muted mb-2">Meeting Link</p>
+            <div className="relative">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none"
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-muted">
+                <path d="M5 7.5l2.5-2.5M7.5 3A2 2 0 1 1 11 6.5L10 7.5M5 8.5A2 2 0 1 1 1.5 5l1-1"
+                  stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+              </svg>
+              <input
+                value={meetingUrl}
+                onChange={e => { setMeetingUrl(e.target.value); autoSaveUrl(e.target.value) }}
+                placeholder="Add a Zoom, Meet, or Teams link…"
+                className="w-full border border-black/8 rounded-xl pl-8 pr-3 py-2 text-sm text-ink placeholder:text-slate-muted/50 focus:outline-none focus:border-violet/30 transition-colors bg-paper-dim/30"
+              />
+            </div>
+            {meetingUrl && !canJoin && (
+              <p className="text-[10px] text-slate-muted mt-1">
+                Join button is visible to you (host) and attendees only.
+              </p>
+            )}
+          </div>
 
           {/* Notes */}
           <div>
@@ -329,23 +456,40 @@ function MeetingDetail({ meeting, members, projectId, onClose, onUpdated, onDele
 export default function Meetings() {
   const { projectId } = useParams()
   const { user } = useAuth()
-  const [meetings, setMeetings]     = useState([])
-  const [members, setMembers]       = useState([])
-  const [loading, setLoading]       = useState(true)
-  const [showNew, setShowNew]       = useState(false)
-  const [selected, setSelected]     = useState(null)
+  const [meetings,    setMeetings]    = useState([])
+  const [members,     setMembers]     = useState([])
+  const [project,     setProject]     = useState(null)
+  const [loading,     setLoading]     = useState(true)
+  const [showNew,     setShowNew]     = useState(false)
+  const [selected,    setSelected]    = useState(null)
+  const [inviteStatus, setInviteStatus] = useState(null) // 'sending' | 'sent' | null
 
   useEffect(() => {
-    Promise.all([getMeetings(projectId), getProjectMembers(projectId)])
-      .then(([m, mem]) => { setMeetings(m); setMembers(mem) })
+    Promise.all([getMeetings(projectId), getProjectMembers(projectId), getProject(projectId)])
+      .then(([m, mem, proj]) => { setMeetings(m); setMembers(mem); setProject(proj) })
       .finally(() => setLoading(false))
   }, [projectId])
+
+  const myProfile = members.find(m => m.id === user?.id)
 
   async function handleCreate(fields) {
     const m = await createMeeting({ ...fields, projectId, userId: user.id })
     setMeetings(prev => [m, ...prev])
     setShowNew(false)
     setSelected(m)
+
+    // Send invite emails in the background
+    if (fields.attendeeIds?.length) {
+      setInviteStatus('sending')
+      sendMeetingInvites({
+        meeting:     m,
+        hostName:    myProfile?.full_name || 'A teammate',
+        projectName: project?.name || 'Tasklane',
+      }).then(() => {
+        setInviteStatus('sent')
+        setTimeout(() => setInviteStatus(null), 3000)
+      }).catch(() => setInviteStatus(null))
+    }
   }
 
   function handleUpdated(updated) {
@@ -446,7 +590,9 @@ export default function Meetings() {
                           <span className="font-mono text-[9px] text-slate-muted">{done}/{total}</span>
                         </div>
                       )}
-                      <p className="text-[10px] text-slate-muted mt-1">{fmtDate(m.date)}</p>
+                      <p className="text-[10px] text-slate-muted mt-1">
+                        {fmtDate(m.date)}{m.meeting_time ? ` · ${formatTime12(m.meeting_time)}` : ''}
+                      </p>
                     </div>
                   </div>
                 </motion.button>
@@ -469,10 +615,41 @@ export default function Meetings() {
             meeting={selected}
             members={members}
             projectId={projectId}
+            currentUserId={user?.id}
             onClose={() => setSelected(null)}
             onUpdated={handleUpdated}
             onDeleted={handleDeleted}
           />
+        )}
+      </AnimatePresence>
+
+      {/* Invite status toast */}
+      <AnimatePresence>
+        {inviteStatus && (
+          <motion.div
+            initial={{ opacity: 0, y: 16, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 16, scale: 0.96 }}
+            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2.5 bg-ink text-white text-xs font-medium px-4 py-2.5 rounded-xl shadow-2xl"
+          >
+            {inviteStatus === 'sending' ? (
+              <>
+                <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}>
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                    <path d="M11 6A5 5 0 1 1 6 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" />
+                  </svg>
+                </motion.div>
+                Sending invites…
+              </>
+            ) : (
+              <>
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                  <path d="M2 6l3 3 5-5" stroke="#36D399" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                Invites sent to attendees
+              </>
+            )}
+          </motion.div>
         )}
       </AnimatePresence>
     </div>

@@ -1071,23 +1071,55 @@ export async function getMeeting(meetingId) {
   return data
 }
 
-export async function createMeeting({ projectId, title, date, agenda, attendeeIds = [], userId }) {
+export async function createMeeting({ projectId, title, date, time, agenda, meetingUrl, attendeeIds = [], userId }) {
   const { data, error } = await supabase
     .from('meetings')
-    .insert({ project_id: projectId, title, date, agenda, attendee_ids: attendeeIds, created_by: userId, notes: '', decisions: '' })
+    .insert({
+      project_id: projectId, title, date, agenda,
+      attendee_ids: attendeeIds, created_by: userId,
+      notes: '', decisions: '',
+      ...(time       && { meeting_time: time }),
+      ...(meetingUrl && { meeting_url:  meetingUrl }),
+    })
     .select()
     .single()
   if (error) throw error
   return data
 }
 
-export async function updateMeeting({ meetingId, title, date, agenda, notes, decisions }) {
+export async function sendMeetingInvites({ meeting, hostName, projectName }) {
+  if (!meeting.attendee_ids?.length) return
+  const supabaseUrl  = import.meta.env.VITE_SUPABASE_URL
+  const supabaseKey  = import.meta.env.VITE_SUPABASE_ANON_KEY
+  await fetch(`${supabaseUrl}/functions/v1/send-meeting-invite`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${supabaseKey}`,
+    },
+    body: JSON.stringify({
+      meeting_id:   meeting.id,
+      title:        meeting.title,
+      date:         meeting.date,
+      time:         meeting.meeting_time,
+      agenda:       meeting.agenda,
+      meeting_url:  meeting.meeting_url,
+      host_name:    hostName,
+      project_name: projectName,
+      attendee_ids: meeting.attendee_ids,
+    }),
+  })
+}
+
+export async function updateMeeting({ meetingId, title, date, time, agenda, meetingUrl, notes, decisions }) {
   const patch = {}
-  if (title     !== undefined) patch.title     = title
-  if (date      !== undefined) patch.date      = date
-  if (agenda    !== undefined) patch.agenda    = agenda
-  if (notes     !== undefined) patch.notes     = notes
-  if (decisions !== undefined) patch.decisions = decisions
+  if (title      !== undefined) patch.title        = title
+  if (date       !== undefined) patch.date         = date
+  if (time       !== undefined) patch.meeting_time = time || null
+  if (agenda     !== undefined) patch.agenda       = agenda
+  if (meetingUrl !== undefined) patch.meeting_url  = meetingUrl || null
+  if (notes      !== undefined) patch.notes        = notes
+  if (decisions  !== undefined) patch.decisions    = decisions
   const { data, error } = await supabase
     .from('meetings')
     .update({ ...patch, updated_at: new Date().toISOString() })
