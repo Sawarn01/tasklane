@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence, useMotionValue, useSpring } from 'framer-motion'
 import { useAuth } from '../lib/AuthContext'
 import {
-  getMyOrg, createProject, createInvite,
+  getMyOrg,
   getProjectsWithStats, getMyAssignedTasks, getMyOrgActivity,
   getMyNotifications, markNotificationRead, markAllNotificationsRead,
   getOrgMembers, getProjectKey, getMyProfile,
@@ -12,6 +12,8 @@ import { supabase } from '../lib/supabase'
 import { signOut } from '../lib/auth'
 import { formatActivity, formatTimeAgo } from '../lib/activityFormat'
 import { IssueTypeIcon, PriorityIcon, StatusBadge } from '../components/IssueIcons'
+import DashboardSidebar from '../components/DashboardSidebar'
+import CreateProjectModal from '../components/CreateProjectModal'
 
 // ── Animated counter ─────────────────────────────────────────
 function AnimatedNumber({ value }) {
@@ -59,65 +61,34 @@ function StatCard({ label, value, icon, accent, delay = 0 }) {
   )
 }
 
-// ── Project card ──────────────────────────────────────────────
-function ProjectCard({ project, index, onClick }) {
+// ── Recent project mini-card ──────────────────────────────────
+function RecentProjectCard({ project, index, onClick }) {
   const pct = project.totalTasks > 0
     ? Math.round((project.doneTasks / project.totalTasks) * 100)
     : 0
   const key = getProjectKey(project.name)
-
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 16 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.35, delay: 0.1 + index * 0.06, ease: 'easeOut' }}
-      whileHover={{ y: -3, transition: { duration: 0.15 } }}
+    <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3, delay: 0.35 + index * 0.05 }}
+      whileHover={{ y: -2, transition: { duration: 0.15 } }}
       onClick={onClick}
-      className="bg-white rounded-2xl border border-black/5 p-5 cursor-pointer group hover:shadow-md transition-shadow"
-    >
-      <div className="flex items-start justify-between mb-3">
-        <div className="w-9 h-9 rounded-xl bg-violet/10 flex items-center justify-center shrink-0">
-          <span className="font-bold text-violet text-xs">{key}</span>
-        </div>
-        <svg
-          width="14" height="14" viewBox="0 0 14 14" fill="none"
-          className="text-slate-muted/40 group-hover:text-violet transition-colors mt-0.5"
-        >
-          <path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
+      className="bg-white rounded-xl border border-black/5 p-4 cursor-pointer group hover:shadow-sm transition-shadow flex items-center gap-3">
+      <div className="w-9 h-9 rounded-xl bg-violet/10 flex items-center justify-center shrink-0">
+        <span className="font-bold text-violet text-[10px]">{key}</span>
       </div>
-      <h3 className="font-semibold text-ink mb-1 truncate">{project.name}</h3>
-      {project.description && (
-        <p className="text-xs text-slate-muted mb-3 line-clamp-2">{project.description}</p>
-      )}
-
-      {/* Task breakdown */}
-      <div className="flex gap-2 mb-3">
-        {[
-          { label: 'Todo', count: project.todoTasks, color: 'bg-slate-200' },
-          { label: 'Progress', count: project.inProgressTasks, color: 'bg-violet/40' },
-          { label: 'Done', count: project.doneTasks, color: 'bg-sage/60' },
-        ].map(({ label, count, color }) => (
-          <div key={label} className="flex items-center gap-1">
-            <div className={`w-1.5 h-1.5 rounded-full ${color}`} />
-            <span className="text-[10px] text-slate-muted">{count}</span>
+      <div className="flex-1 min-w-0">
+        <p className="font-medium text-ink text-sm truncate group-hover:text-violet transition-colors">{project.name}</p>
+        <div className="flex items-center gap-2 mt-1">
+          <div className="flex-1 h-1 bg-paper-dim rounded-full overflow-hidden">
+            <div className="h-full bg-sage rounded-full" style={{ width: `${pct}%` }} />
           </div>
-        ))}
+          <span className="font-mono text-[9px] text-slate-muted shrink-0">{pct}%</span>
+        </div>
       </div>
-
-      {/* Progress bar */}
-      <div className="w-full h-1.5 bg-paper-dim rounded-full overflow-hidden">
-        <motion.div
-          initial={{ width: 0 }}
-          animate={{ width: `${pct}%` }}
-          transition={{ duration: 0.7, delay: 0.3 + index * 0.06, ease: 'easeOut' }}
-          className="h-full bg-sage rounded-full"
-        />
-      </div>
-      <div className="flex justify-between mt-1.5">
-        <span className="text-[10px] text-slate-muted">{project.totalTasks} issues</span>
-        <span className="text-[10px] text-slate-muted font-mono">{pct}%</span>
-      </div>
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none"
+        className="text-slate-muted/30 group-hover:text-violet transition-colors shrink-0">
+        <path d="M3 2l4 4-4 4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+      </svg>
     </motion.div>
   )
 }
@@ -182,79 +153,6 @@ function NotificationsPanel({ notifications, onSelect, onMarkAll, onClose }) {
   )
 }
 
-// ── Create project modal ──────────────────────────────────────
-function CreateProjectModal({ orgId, userId, onCreated, onClose }) {
-  const [name, setName] = useState('')
-  const [description, setDescription] = useState('')
-  const [creating, setCreating] = useState(false)
-  const [error, setError] = useState('')
-
-  async function handleSubmit(e) {
-    e.preventDefault()
-    if (!name.trim()) return
-    setCreating(true)
-    try {
-      await createProject({ orgId, name: name.trim(), description: description.trim(), userId })
-      onCreated()
-    } catch (err) {
-      setError(err.message)
-    } finally {
-      setCreating(false)
-    }
-  }
-
-  return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 bg-ink/40 z-50 flex items-center justify-center p-4"
-      onClick={onClose}
-    >
-      <motion.div
-        initial={{ scale: 0.95, opacity: 0, y: 8 }}
-        animate={{ scale: 1, opacity: 1, y: 0 }}
-        exit={{ scale: 0.95, opacity: 0 }}
-        transition={{ duration: 0.2 }}
-        className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h3 className="font-semibold text-ink mb-5">Create new project</h3>
-        {error && <p className="text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2 mb-3">{error}</p>}
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="font-mono text-[10px] uppercase tracking-wider text-slate-muted block mb-1.5">Project name *</label>
-            <input
-              autoFocus required
-              value={name} onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Marketing website"
-              className="w-full text-sm rounded-xl border border-black/10 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-violet/30"
-            />
-          </div>
-          <div>
-            <label className="font-mono text-[10px] uppercase tracking-wider text-slate-muted block mb-1.5">Description</label>
-            <textarea
-              value={description} onChange={(e) => setDescription(e.target.value)}
-              rows={2} placeholder="What is this project about?"
-              className="w-full text-sm rounded-xl border border-black/10 px-3 py-2.5 resize-none focus:outline-none focus:ring-2 focus:ring-violet/30"
-            />
-          </div>
-          <div className="flex gap-3 pt-1">
-            <button
-              type="submit" disabled={creating}
-              className="flex-1 bg-violet text-white text-sm rounded-xl py-2.5 hover:bg-violet/90 disabled:opacity-50 transition-colors font-medium"
-            >
-              {creating ? 'Creating…' : 'Create project'}
-            </button>
-            <button type="button" onClick={onClose} className="px-4 text-sm text-slate-muted hover:text-ink transition-colors">
-              Cancel
-            </button>
-          </div>
-        </form>
-      </motion.div>
-    </motion.div>
-  )
-}
 
 // ── Activity icon per action ──────────────────────────────────
 function ActivityIcon({ action }) {
@@ -292,15 +190,11 @@ export default function Dashboard() {
   const [loading, setLoading]       = useState(true)
   const [error, setError]           = useState('')
 
-  const [showNewProject, setShowNewProject] = useState(false)
-  const [showNotifs, setShowNotifs]         = useState(false)
+  const [showNewProject,  setShowNewProject]  = useState(false)
+  const [showNotifs,      setShowNotifs]      = useState(false)
   const [showProfileMenu, setShowProfileMenu] = useState(false)
   const profileMenuRef = useRef(null)
-  const [inviteLink, setInviteLink]         = useState('')
-  const [generatingInvite, setGeneratingInvite] = useState(false)
-  const [copySuccess, setCopySuccess]           = useState(false)
-
-  const notifsRef = useRef(null)
+  const notifsRef      = useRef(null)
 
   useEffect(() => { loadAll() }, [])
 
@@ -368,25 +262,6 @@ export default function Dashboard() {
     }
   }
 
-  async function handleGenerateInvite() {
-    setGeneratingInvite(true)
-    try {
-      const invite = await createInvite({ orgId: org.id, createdBy: user.id })
-      setInviteLink(`${window.location.origin}/signup?invite=${invite.token}`)
-      setCopySuccess(false)
-    } catch (err) {
-      setError(err.message)
-    } finally {
-      setGeneratingInvite(false)
-    }
-  }
-
-  async function handleCopyInvite() {
-    await navigator.clipboard.writeText(inviteLink)
-    setCopySuccess(true)
-    setTimeout(() => setCopySuccess(false), 2000)
-  }
-
   async function handleMarkRead(id) {
     await markNotificationRead(id)
     setNotifications((prev) => prev.map((n) => n.id === id ? { ...n, read: true } : n))
@@ -426,203 +301,11 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen flex bg-paper">
-      {/* ── Sidebar ────────────────────────────────────────── */}
-      <motion.aside
-        initial={{ x: -24, opacity: 0 }}
-        animate={{ x: 0, opacity: 1 }}
-        transition={{ duration: 0.4, ease: 'easeOut' }}
-        className="w-56 bg-white border-r border-black/5 flex flex-col shrink-0 h-screen sticky top-0"
-      >
-        {/* ── Logo ─────────────────────────────────────── */}
-        <div className="px-5 pt-5 pb-4">
-          <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 bg-ink rounded-lg flex items-center justify-center shrink-0">
-              <div className="w-3 h-3 bg-violet rounded-sm" />
-            </div>
-            <span className="font-bold text-ink text-[15px] tracking-tight">Tasklane</span>
-          </div>
-        </div>
-
-        {/* ── Workspace block ───────────────────────────── */}
-        <div className="mx-3 mb-3">
-          <button
-            onClick={() => (role === 'owner' || role === 'admin') && navigate('/org/settings')}
-            className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-paper-dim transition-colors text-left group ${(role === 'owner' || role === 'admin') ? 'hover:bg-paper-dim/80 cursor-pointer' : 'cursor-default'}`}
-          >
-            <div className="w-7 h-7 rounded-lg bg-ink flex items-center justify-center shrink-0">
-              <span className="text-white font-bold text-xs">{(org?.name || 'W')[0].toUpperCase()}</span>
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-ink truncate leading-tight">{org?.name}</p>
-              <div className="flex items-center gap-1 mt-0.5">
-                <span className="font-mono text-[9px] uppercase tracking-wider text-violet">{org?.plan}</span>
-                <span className="text-slate-muted/40 text-[9px]">·</span>
-                <span className="text-[9px] text-slate-muted capitalize">{role}</span>
-              </div>
-            </div>
-            {(role === 'owner' || role === 'admin') && (
-              <svg width="10" height="10" viewBox="0 0 10 10" fill="none" className="text-slate-muted/30 group-hover:text-slate-muted/60 transition-colors shrink-0">
-                <path d="M3 2l4 3-4 3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-              </svg>
-            )}
-          </button>
-        </div>
-
-        {/* ── Divider ───────────────────────────────────── */}
-        <div className="mx-5 border-t border-black/5 mb-3" />
-
-        {/* ── Invite (admin/owner only) ─────────────────── */}
-        {(role === 'owner' || role === 'admin') && (
-          <div className="px-3 mb-1">
-            {!inviteLink ? (
-              <motion.button
-                whileTap={{ scale: 0.97 }}
-                onClick={handleGenerateInvite}
-                disabled={generatingInvite}
-                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm text-slate-muted hover:text-ink hover:bg-paper-dim transition-colors disabled:opacity-50 text-left"
-              >
-                <div className="w-5 h-5 rounded-md bg-paper-dim flex items-center justify-center shrink-0">
-                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                    <circle cx="4" cy="4" r="2.2" stroke="currentColor" strokeWidth="1.2" />
-                    <path d="M7.5 6.5l2 2M7 5h2.5M8.2 3.8v2.4" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" />
-                  </svg>
-                </div>
-                {generatingInvite ? 'Generating…' : 'Invite teammate'}
-              </motion.button>
-            ) : (
-              <motion.div
-                initial={{ opacity: 0, y: -4 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="bg-violet/5 border border-violet/10 rounded-xl p-2.5"
-              >
-                <p className="font-mono text-[9px] text-violet/70 uppercase tracking-wide mb-1.5">Invite link · 1 use</p>
-                <div className="flex gap-1.5">
-                  <input
-                    readOnly value={inviteLink}
-                    onClick={(e) => e.target.select()}
-                    className="flex-1 text-[10px] bg-white rounded-lg px-2 py-1.5 border border-black/5 truncate focus:outline-none text-ink"
-                  />
-                  <button
-                    onClick={handleCopyInvite}
-                    className="text-[10px] bg-violet text-white rounded-lg px-2 py-1.5 shrink-0 hover:bg-violet/90 transition-colors font-medium"
-                  >
-                    {copySuccess ? '✓' : 'Copy'}
-                  </button>
-                </div>
-                <button onClick={() => setInviteLink('')} className="text-[9px] text-slate-muted hover:text-ink mt-1.5 transition-colors">
-                  Generate new link
-                </button>
-              </motion.div>
-            )}
-          </div>
-        )}
-
-        {/* ── Projects ──────────────────────────────────── */}
-        <div className="flex-1 overflow-y-auto px-3 py-1">
-          <div className="flex items-center justify-between px-2 mb-1.5">
-            <p className="font-mono text-[9px] uppercase tracking-widest text-slate-muted/70 font-semibold select-none">
-              Projects
-            </p>
-            <motion.button
-              whileTap={{ scale: 0.9 }}
-              onClick={() => setShowNewProject(true)}
-              className="w-5 h-5 rounded-md hover:bg-paper-dim flex items-center justify-center transition-colors text-slate-muted hover:text-ink"
-              title="New project"
-            >
-              <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                <path d="M5 1v8M1 5h8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-              </svg>
-            </motion.button>
-          </div>
-
-          <nav className="space-y-0.5">
-            <AnimatePresence initial={false}>
-              {projects.map((p, i) => (
-                <motion.button
-                  key={p.id}
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -10 }}
-                  transition={{ delay: i * 0.035, duration: 0.22 }}
-                  onClick={() => navigate(`/projects/${p.id}`)}
-                  className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl hover:bg-paper-dim transition-colors text-left group"
-                >
-                  {/* Color dot */}
-                  <div className="w-5 h-5 rounded-md bg-violet/10 flex items-center justify-center shrink-0">
-                    <span className="text-[8px] font-bold text-violet leading-none">{getProjectKey(p.name).slice(0, 2)}</span>
-                  </div>
-                  <span className="flex-1 truncate text-[13px] text-ink/80 group-hover:text-ink transition-colors">{p.name}</span>
-                  {/* Task count badge — appears on hover */}
-                  {p.totalTasks > 0 && (
-                    <span className="text-[9px] font-mono text-slate-muted/50 opacity-0 group-hover:opacity-100 transition-opacity bg-paper-dim rounded px-1 py-0.5">
-                      {p.totalTasks}
-                    </span>
-                  )}
-                </motion.button>
-              ))}
-            </AnimatePresence>
-
-            {projects.length === 0 && (
-              <motion.button
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                onClick={() => setShowNewProject(true)}
-                className="w-full flex items-center gap-2 px-2.5 py-2 rounded-xl border border-dashed border-black/10 text-slate-muted hover:text-ink hover:border-violet/30 hover:bg-violet/2 transition-all text-left"
-              >
-                <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                  <path d="M6 1v10M1 6h10" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-                </svg>
-                <span className="text-xs">Create first project</span>
-              </motion.button>
-            )}
-
-            {/* New project shortcut at bottom of list */}
-            {projects.length > 0 && (
-              <button
-                onClick={() => setShowNewProject(true)}
-                className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl text-slate-muted/50 hover:text-slate-muted hover:bg-paper-dim transition-colors text-left"
-              >
-                <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                  <path d="M6 1v10M1 6h10" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-                </svg>
-                <span className="text-xs">New project</span>
-              </button>
-            )}
-          </nav>
-        </div>
-
-        {/* ── User footer ───────────────────────────────── */}
-        <div className="border-t border-black/5 px-3 py-3">
-          <motion.button
-            whileTap={{ scale: 0.98 }}
-            onClick={() => navigate('/profile')}
-            className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl hover:bg-paper-dim transition-colors text-left group"
-          >
-            {/* Avatar */}
-            <div className="w-7 h-7 rounded-full overflow-hidden ring-2 ring-black/6 shrink-0">
-              {profile?.avatar_url ? (
-                <img src={profile.avatar_url} alt={profile.full_name} className="w-full h-full object-cover" />
-              ) : (
-                <div className="w-full h-full bg-violet/15 flex items-center justify-center">
-                  <span className="text-[10px] font-bold text-violet">
-                    {(profile?.full_name || user?.email || 'U')[0].toUpperCase()}
-                  </span>
-                </div>
-              )}
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-[13px] font-medium text-ink truncate leading-tight">{profile?.full_name || user?.email}</p>
-              <p className="text-[10px] text-slate-muted truncate">{user?.email}</p>
-            </div>
-            <svg
-              width="12" height="12" viewBox="0 0 12 12" fill="none"
-              className="text-slate-muted/30 group-hover:text-slate-muted/60 transition-colors shrink-0"
-            >
-              <path d="M4 2l4 4-4 4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-            </svg>
-          </motion.button>
-        </div>
-      </motion.aside>
+      <DashboardSidebar
+        org={org} role={role} profile={profile} user={user}
+        projects={projects}
+        onNewProject={() => setShowNewProject(true)}
+      />
 
       {/* ── Main area ──────────────────────────────────────── */}
       <main className="flex-1 min-w-0 overflow-y-auto">
@@ -959,30 +642,21 @@ export default function Dashboard() {
             </motion.div>
           )}
 
-          {/* Projects grid */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.4 }}
-          >
+          {/* Recent projects teaser */}
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4 }}>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="font-semibold text-ink">Projects</h2>
-              <button
-                onClick={() => setShowNewProject(true)}
-                className="flex items-center gap-1.5 text-sm text-violet hover:opacity-70 transition-opacity"
-              >
-                <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                  <path d="M6 1v10M1 6h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+              <h2 className="font-semibold text-ink">Recent projects</h2>
+              <button onClick={() => navigate('/projects')}
+                className="text-xs text-violet hover:opacity-70 transition-opacity flex items-center gap-1">
+                View all
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                  <path d="M2 5h6M5 2l3 3-3 3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
-                New project
               </button>
             </div>
             {projects.length === 0 ? (
-              <motion.div
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="bg-white rounded-2xl border border-dashed border-black/10 p-10 text-center"
-              >
+              <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+                className="bg-white rounded-2xl border border-dashed border-black/10 p-10 text-center">
                 <div className="w-12 h-12 bg-paper-dim rounded-2xl flex items-center justify-center mx-auto mb-3">
                   <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
                     <rect x="2" y="2" width="8" height="8" rx="2" stroke="#8A8F98" strokeWidth="1.4" />
@@ -993,38 +667,27 @@ export default function Dashboard() {
                 </div>
                 <p className="font-semibold text-ink mb-1">Create your first project</p>
                 <p className="text-sm text-slate-muted mb-4">Organize your team's work into focused projects.</p>
-                <button
-                  onClick={() => setShowNewProject(true)}
-                  className="bg-violet text-white text-sm rounded-xl px-5 py-2.5 hover:bg-violet/90 transition-colors"
-                >
+                <button onClick={() => setShowNewProject(true)}
+                  className="bg-violet text-white text-sm rounded-xl px-5 py-2.5 hover:bg-violet/90 transition-colors">
                   Create project
                 </button>
               </motion.div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                {projects.map((p, i) => (
-                  <ProjectCard
-                    key={p.id}
-                    project={p}
-                    index={i}
-                    onClick={() => navigate(`/projects/${p.id}`)}
-                  />
+              <div className="space-y-2">
+                {projects.slice(0, 3).map((p, i) => (
+                  <RecentProjectCard key={p.id} project={p} index={i} onClick={() => navigate(`/projects/${p.id}`)} />
                 ))}
-                {/* New project tile */}
-                <motion.button
-                  initial={{ opacity: 0, y: 16 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.35, delay: 0.1 + projects.length * 0.06 }}
-                  whileHover={{ y: -3, transition: { duration: 0.15 } }}
-                  onClick={() => setShowNewProject(true)}
-                  className="bg-white rounded-2xl border border-dashed border-black/10 p-5 flex flex-col items-center justify-center gap-2 hover:border-violet/30 hover:bg-violet/2 transition-all min-h-36"
-                >
-                  <div className="w-10 h-10 rounded-xl border-2 border-dashed border-black/10 flex items-center justify-center">
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                      <path d="M8 2v12M2 8h12" stroke="#8A8F98" strokeWidth="1.5" strokeLinecap="round" />
-                    </svg>
-                  </div>
-                  <p className="text-sm text-slate-muted">New project</p>
+                <motion.button initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                  transition={{ delay: 0.5 }}
+                  onClick={() => navigate('/projects')}
+                  className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-dashed border-black/8 text-slate-muted hover:text-violet hover:border-violet/30 transition-colors text-sm">
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                    <rect x="1" y="1" width="4" height="4" rx="0.8" stroke="currentColor" strokeWidth="1.2" />
+                    <rect x="7" y="1" width="4" height="4" rx="0.8" stroke="currentColor" strokeWidth="1.2" />
+                    <rect x="1" y="7" width="4" height="4" rx="0.8" stroke="currentColor" strokeWidth="1.2" />
+                    <rect x="7" y="7" width="4" height="4" rx="0.8" stroke="currentColor" strokeWidth="1.2" />
+                  </svg>
+                  View all {projects.length} projects
                 </motion.button>
               </div>
             )}
