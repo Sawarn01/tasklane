@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { motion, AnimatePresence } from 'framer-motion'
-import { createInvite, getProjectKey } from '../lib/data'
+import { motion } from 'framer-motion'
+import { createInvite } from '../lib/data'
 
 export default function DashboardSidebar({
   org, role, profile, user,
@@ -178,59 +178,7 @@ export default function DashboardSidebar({
         </div>
       )}
 
-      {/* Project list */}
-      <div className="flex-1 overflow-y-auto px-3 py-1">
-        <div className="flex items-center justify-between px-2 mb-1.5">
-          <p className="font-mono text-[9px] uppercase tracking-widest text-slate-muted/70 font-semibold select-none">Projects</p>
-          <motion.button whileTap={{ scale: 0.9 }} onClick={onNewProject} title="New project"
-            className="w-5 h-5 rounded-md hover:bg-paper-dim flex items-center justify-center transition-colors text-slate-muted hover:text-ink">
-            <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-              <path d="M5 1v8M1 5h8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-            </svg>
-          </motion.button>
-        </div>
-
-        <nav className="space-y-0.5">
-          <AnimatePresence initial={false}>
-            {projects.map((p, i) => (
-              <motion.button key={p.id} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -10 }} transition={{ delay: i * 0.03, duration: 0.2 }}
-                onClick={() => navigate(`/projects/${p.id}`)}
-                className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl hover:bg-paper-dim transition-colors text-left group">
-                <div className="w-5 h-5 rounded-md bg-violet/10 flex items-center justify-center shrink-0">
-                  <span className="text-[8px] font-bold text-violet leading-none">{getProjectKey(p.name).slice(0, 2)}</span>
-                </div>
-                <span className="flex-1 truncate text-[13px] text-ink/80 group-hover:text-ink transition-colors">{p.name}</span>
-                {p.totalTasks > 0 && (
-                  <span className="text-[9px] font-mono text-slate-muted/50 opacity-0 group-hover:opacity-100 transition-opacity bg-paper-dim rounded px-1 py-0.5">
-                    {p.totalTasks}
-                  </span>
-                )}
-              </motion.button>
-            ))}
-          </AnimatePresence>
-
-          {projects.length === 0 && (
-            <motion.button initial={{ opacity: 0 }} animate={{ opacity: 1 }} onClick={onNewProject}
-              className="w-full flex items-center gap-2 px-2.5 py-2 rounded-xl border border-dashed border-black/10 text-slate-muted hover:text-ink hover:border-violet/30 hover:bg-violet/2 transition-all text-left">
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                <path d="M6 1v10M1 6h10" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-              </svg>
-              <span className="text-xs">Create first project</span>
-            </motion.button>
-          )}
-
-          {projects.length > 0 && (
-            <button onClick={onNewProject}
-              className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl text-slate-muted/50 hover:text-slate-muted hover:bg-paper-dim transition-colors text-left">
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                <path d="M6 1v10M1 6h10" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-              </svg>
-              <span className="text-xs">New project</span>
-            </button>
-          )}
-        </nav>
-      </div>
+      <div className="flex-1" />
 
       {/* User footer */}
       <div className="border-t border-black/5 px-3 py-3">
