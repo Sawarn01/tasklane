@@ -81,6 +81,15 @@ export default function DashboardSidebar({
         </svg>
       ),
     },
+    {
+      href: '/finances',
+      label: 'Finances',
+      icon: (
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+          <path d="M7 1.5v11M4 4.5C4 3.1 5.3 2 7 2s3 1.1 3 2.5c0 3-6 3-6 6 0 1.4 1.3 2.5 3 2.5s3-1.1 3-2.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+        </svg>
+      ),
+    },
   ]
 
   return (
