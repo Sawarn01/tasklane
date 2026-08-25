@@ -1,123 +1,53 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { supabase } from '../lib/supabase'
+import {
+  Room, RoomEvent, Track, VideoPresets,
+  createLocalAudioTrack, createLocalVideoTrack,
+} from 'livekit-client'
+import { getLiveKitToken } from '../lib/data'
 
-const ICE_SERVERS = [
-  { urls: 'stun:stun.l.google.com:19302' },
-  { urls: 'stun:stun1.l.google.com:19302' },
-  { urls: 'stun:stun2.l.google.com:19302' },
-]
-
-// Detect audio level from a stream (returns a cleanup fn)
+// ── Audio level monitor ───────────────────────────────────────────────────────
+// 5fps (200ms) keeps CPU flat regardless of participant count.
 export function watchAudioLevel(stream, onLevel) {
   if (!stream?.getAudioTracks().length) return () => {}
-  let ctx, raf
+  let ctx, interval
   try {
     ctx = new AudioContext()
-    const src      = ctx.createMediaStreamSource(stream)
+    const src     = ctx.createMediaStreamSource(stream)
     const analyser = ctx.createAnalyser()
     analyser.fftSize = 256
     src.connect(analyser)
-    const data = new Uint8Array(analyser.frequencyBinCount)
-    function tick() {
-      analyser.getByteFrequencyData(data)
-      const avg = data.reduce((a, b) => a + b, 0) / data.length
-      onLevel(avg)
-      raf = requestAnimationFrame(tick)
-    }
-    tick()
+    const buf = new Uint8Array(analyser.frequencyBinCount)
+    interval = setInterval(() => {
+      analyser.getByteFrequencyData(buf)
+      onLevel(buf.reduce((a, b) => a + b, 0) / buf.length)
+    }, 200)
   } catch {}
-  return () => {
-    cancelAnimationFrame(raf)
-    ctx?.close().catch(() => {})
-  }
+  return () => { clearInterval(interval); ctx?.close().catch(() => {}) }
 }
 
+export const QUALITY = { HIGH: 'high', MEDIUM: 'medium', LOW: 'low', AUDIO: 'audio' }
+
+// ── Hook ──────────────────────────────────────────────────────────────────────
 export function useWebRTC({ meetingId, userId, displayName, enabled = true }) {
   const [localStream,   setLocalStream]   = useState(null)
-  const [peers,         setPeers]         = useState({})  // peerId → { stream, displayName }
+  const [peers,         setPeers]         = useState({})
   const [audioEnabled,  setAudioEnabled]  = useState(true)
   const [videoEnabled,  setVideoEnabled]  = useState(true)
   const [screenSharing, setScreenSharing] = useState(false)
-  const [status,        setStatus]        = useState('connecting') // connecting | connected | error
+  const [status,        setStatus]        = useState('connecting')
   const [mediaError,    setMediaError]    = useState(null)
 
-  const pcs         = useRef({})  // peerId → RTCPeerConnection
-  const localRef    = useRef(null)
-  const channelRef  = useRef(null)
-  const iceBuf      = useRef({})  // peerId → RTCIceCandidateInit[]  (buffered before remoteDesc)
-  const origTrack   = useRef(null) // camera track saved during screen share
-  const mounted     = useRef(true)
+  const roomRef    = useRef(null)
+  const mounted    = useRef(true)
+  // Stable MediaStream per remote participant — mutated in place so the
+  // video element never needs to reinitialize (eliminates the delay/flash).
+  const streamMap  = useRef({})
 
-  function send(event, payload) {
-    channelRef.current?.send({ type: 'broadcast', event, payload })
-  }
-
-  function updatePeer(peerId, patch) {
-    setPeers(prev => {
-      if (!prev[peerId] && !patch) return prev
-      return { ...prev, [peerId]: { ...prev[peerId], ...patch } }
-    })
-  }
-
-  function removePeer(peerId) {
-    setPeers(prev => {
-      const next = { ...prev }
-      delete next[peerId]
-      return next
-    })
-  }
-
-  function closePC(peerId) {
-    pcs.current[peerId]?.close()
-    delete pcs.current[peerId]
-    delete iceBuf.current[peerId]
-    removePeer(peerId)
-  }
-
-  function createPC(peerId) {
-    if (pcs.current[peerId]) return pcs.current[peerId]
-
-    const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS })
-    pcs.current[peerId] = pc
-
-    // Add local tracks to this connection
-    if (localRef.current) {
-      localRef.current.getTracks().forEach(t => pc.addTrack(t, localRef.current))
+  function getOrCreateStream(identity) {
+    if (!streamMap.current[identity]) {
+      streamMap.current[identity] = new MediaStream()
     }
-
-    pc.onicecandidate = ({ candidate }) => {
-      if (candidate) {
-        send('ice', { from: userId, to: peerId, candidate: candidate.toJSON() })
-      }
-    }
-
-    pc.ontrack = ({ streams }) => {
-      if (!mounted.current) return
-      updatePeer(peerId, { stream: streams[0] })
-    }
-
-    pc.onconnectionstatechange = () => {
-      if (['failed', 'closed'].includes(pc.connectionState)) closePC(peerId)
-    }
-
-    pc.onsignalingstatechange = () => {
-      // Flush buffered ICE candidates when remote description has been set
-      if (pc.signalingState !== 'stable') return
-      const buf = iceBuf.current[peerId] || []
-      buf.forEach(c => pc.addIceCandidate(new RTCIceCandidate(c)).catch(() => {}))
-      delete iceBuf.current[peerId]
-    }
-
-    return pc
-  }
-
-  async function initiateOffer(peerId) {
-    const pc = createPC(peerId)
-    try {
-      const offer = await pc.createOffer()
-      await pc.setLocalDescription(offer)
-      send('offer', { from: userId, to: peerId, sdp: pc.localDescription })
-    } catch {}
+    return streamMap.current[identity]
   }
 
   useEffect(() => {
@@ -125,197 +55,250 @@ export function useWebRTC({ meetingId, userId, displayName, enabled = true }) {
     mounted.current = true
 
     async function init() {
-      // Acquire camera + mic
-      let stream
+      let token
       try {
-        stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true })
-      } catch {
-        try {
-          // Fallback: audio only
-          stream = await navigator.mediaDevices.getUserMedia({ video: false, audio: true })
-          setMediaError('camera')
-        } catch {
-          setStatus('error')
-          setMediaError('both')
-          return
-        }
+        token = await getLiveKitToken({ roomName: meetingId, displayName })
+      } catch (err) {
+        console.error('LiveKit token error:', err)
+        if (mounted.current) { setStatus('error'); setMediaError('both') }
+        return
       }
 
-      if (!mounted.current) { stream.getTracks().forEach(t => t.stop()); return }
-      localRef.current = stream
-      setLocalStream(stream)
-
-      // Set up Supabase Realtime channel
-      const ch = supabase.channel(`meeting-room-${meetingId}`, {
-        config: {
-          presence:  { key: userId },
-          broadcast: { self: false, ack: false },
+      const room = new Room({
+        // adaptiveStream needs LiveKit React components to observe element sizes.
+        // dynacast needs adaptiveStream to know which quality layer to pick.
+        // Both disabled → single stream at the explicit bitrate below.
+        adaptiveStream: false,
+        dynacast:       false,
+        videoCaptureDefaults: {
+          resolution: VideoPresets.h720.resolution,
+          facingMode: 'user',
+        },
+        audioCaptureDefaults: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl:  true,
+        },
+        publishDefaults: {
+          videoCodec: 'vp8',
+          videoEncoding: {
+            maxBitrate:   2_500_000,  // 2.5 Mbps — crisp 720p
+            maxFramerate: 30,
+          },
+          audioEncoding: {
+            maxBitrate: 64_000,       // 64 kbps — clear voice
+          },
+          dtx:                true,   // silence → minimal audio bandwidth
+          red:                true,   // audio packet-loss redundancy
+          stopMicTrackOnMute: false,
         },
       })
-      channelRef.current = ch
+      roomRef.current = room
 
-      // ── Presence: who's in the room ──
-      ch.on('presence', { event: 'sync' }, () => {
-        const state = ch.presenceState()
-        Object.entries(state).forEach(([pid, presences]) => {
-          if (pid === userId) return
-          const p = presences[0]
-          updatePeer(pid, { displayName: p?.displayName || 'Guest' })
+      // ── Track events: mutate the stable MediaStream, don't replace it ────────
+      // Replacing stream causes VideoTile to re-set srcObject which stalls the
+      // decoder for ~200-400ms. Mutating tracks is invisible to the video element.
+      room.on(RoomEvent.TrackSubscribed, (track, _pub, participant) => {
+        if (track.kind !== Track.Kind.Video && track.kind !== Track.Kind.Audio) return
+        const ms = getOrCreateStream(participant.identity)
+        try { ms.addTrack(track.mediaStreamTrack) } catch {}
+        if (!mounted.current) return
+        setPeers(prev => ({
+          ...prev,
+          [participant.identity]: {
+            ...prev[participant.identity],
+            stream:       ms,
+            displayName:  participant.name || participant.identity,
+            videoEnabled: participant.isCameraEnabled,
+            audioEnabled: participant.isMicrophoneEnabled,
+          },
+        }))
+      })
+
+      room.on(RoomEvent.TrackUnsubscribed, (track, _pub, participant) => {
+        const ms = streamMap.current[participant.identity]
+        if (ms) try { ms.removeTrack(track.mediaStreamTrack) } catch {}
+        if (!mounted.current) return
+        setPeers(prev => ({
+          ...prev,
+          [participant.identity]: {
+            ...prev[participant.identity],
+            videoEnabled: participant.isCameraEnabled,
+            audioEnabled: participant.isMicrophoneEnabled,
+          },
+        }))
+      })
+
+      room.on(RoomEvent.TrackMuted, (_pub, participant) => {
+        if (!mounted.current) return
+        setPeers(prev => ({
+          ...prev,
+          [participant.identity]: {
+            ...prev[participant.identity],
+            videoEnabled: participant.isCameraEnabled,
+            audioEnabled: participant.isMicrophoneEnabled,
+          },
+        }))
+      })
+
+      room.on(RoomEvent.TrackUnmuted, (_pub, participant) => {
+        if (!mounted.current) return
+        setPeers(prev => ({
+          ...prev,
+          [participant.identity]: {
+            ...prev[participant.identity],
+            videoEnabled: participant.isCameraEnabled,
+            audioEnabled: participant.isMicrophoneEnabled,
+          },
+        }))
+      })
+
+      room.on(RoomEvent.ParticipantConnected, participant => {
+        if (!mounted.current) return
+        setPeers(prev => ({
+          ...prev,
+          [participant.identity]: {
+            ...prev[participant.identity],
+            stream:       getOrCreateStream(participant.identity),
+            displayName:  participant.name || participant.identity,
+            videoEnabled: true,
+            audioEnabled: true,
+          },
+        }))
+      })
+
+      room.on(RoomEvent.ParticipantDisconnected, participant => {
+        delete streamMap.current[participant.identity]
+        if (!mounted.current) return
+        setPeers(prev => { const n = { ...prev }; delete n[participant.identity]; return n })
+      })
+
+      room.on(RoomEvent.Disconnected, () => {
+        if (mounted.current) setStatus('error')
+      })
+
+      try {
+        await room.connect(import.meta.env.VITE_LIVEKIT_URL, token)
+      } catch (err) {
+        console.error('LiveKit connect error:', err)
+        if (mounted.current) { setStatus('error'); setMediaError('both') }
+        return
+      }
+
+      // Publish local tracks
+      const [audioResult, videoResult] = await Promise.allSettled([
+        createLocalAudioTrack({ echoCancellation: true, noiseSuppression: true, autoGainControl: true, sampleRate: 48000 }),
+        createLocalVideoTrack({ resolution: VideoPresets.h720.resolution, facingMode: 'user' }),
+      ])
+
+      if (audioResult.status === 'fulfilled') {
+        await room.localParticipant.publishTrack(audioResult.value).catch(() => {})
+      }
+      if (videoResult.status === 'fulfilled') {
+        await room.localParticipant.publishTrack(videoResult.value).catch(() => {})
+      } else {
+        if (mounted.current) setMediaError('camera')
+      }
+
+      if (!mounted.current) { room.disconnect(); return }
+
+      // Build local stream from LiveKit's published track references
+      const localMs = new MediaStream()
+      room.localParticipant.trackPublications.forEach(pub => {
+        if (pub.track && (pub.kind === Track.Kind.Video || pub.kind === Track.Kind.Audio)) {
+          try { localMs.addTrack(pub.track.mediaStreamTrack) } catch {}
+        }
+      })
+
+      // Snapshot existing remote participants
+      room.remoteParticipants.forEach((p, identity) => {
+        const ms = getOrCreateStream(identity)
+        p.trackPublications.forEach(pub => {
+          if (pub.isSubscribed && pub.track &&
+              (pub.kind === Track.Kind.Video || pub.kind === Track.Kind.Audio)) {
+            try { ms.addTrack(pub.track.mediaStreamTrack) } catch {}
+          }
         })
+        setPeers(prev => ({
+          ...prev,
+          [identity]: {
+            stream:       ms.getTracks().length ? ms : null,
+            displayName:  p.name || identity,
+            videoEnabled: p.isCameraEnabled,
+            audioEnabled: p.isMicrophoneEnabled,
+          },
+        }))
       })
 
-      ch.on('presence', { event: 'join' }, ({ key: peerId, newPresences }) => {
-        if (peerId === userId) return
-        const p = newPresences[0]
-        updatePeer(peerId, { displayName: p?.displayName || 'Guest' })
-        // Higher userId initiates (consistent tie-break, avoids double-offer)
-        if (userId > peerId) initiateOffer(peerId)
-      })
-
-      ch.on('presence', { event: 'leave' }, ({ key: peerId }) => {
-        closePC(peerId)
-      })
-
-      // ── Signaling: offer / answer / ICE ──
-      ch.on('broadcast', { event: 'offer' }, async ({ payload }) => {
-        if (payload.to !== userId) return
-        const { from, sdp } = payload
-        const pc = createPC(from)
-        try {
-          await pc.setRemoteDescription(new RTCSessionDescription(sdp))
-          const answer = await pc.createAnswer()
-          await pc.setLocalDescription(answer)
-          send('answer', { from: userId, to: from, sdp: pc.localDescription })
-        } catch {}
-      })
-
-      ch.on('broadcast', { event: 'answer' }, async ({ payload }) => {
-        if (payload.to !== userId) return
-        const pc = pcs.current[payload.from]
-        if (!pc) return
-        try {
-          await pc.setRemoteDescription(new RTCSessionDescription(payload.sdp))
-        } catch {}
-      })
-
-      ch.on('broadcast', { event: 'ice' }, async ({ payload }) => {
-        if (payload.to !== userId) return
-        const pc = pcs.current[payload.from]
-        if (!pc || !pc.remoteDescription) {
-          // Buffer until remote description is set
-          iceBuf.current[payload.from] = [
-            ...(iceBuf.current[payload.from] || []),
-            payload.candidate,
-          ]
-          return
-        }
-        try {
-          await pc.addIceCandidate(new RTCIceCandidate(payload.candidate))
-        } catch {}
-      })
-
-      await ch.subscribe(async (state) => {
-        if (state === 'SUBSCRIBED') {
-          await ch.track({ userId, displayName })
-          if (mounted.current) setStatus('connected')
-        }
-      })
+      setLocalStream(localMs.getTracks().length ? localMs : null)
+      setStatus('connected')
     }
 
     init()
 
     return () => {
       mounted.current = false
-      Object.keys(pcs.current).forEach(id => { pcs.current[id]?.close() })
-      pcs.current  = {}
-      iceBuf.current = {}
-      localRef.current?.getTracks().forEach(t => t.stop())
-      if (channelRef.current) {
-        channelRef.current.untrack().catch(() => {})
-        supabase.removeChannel(channelRef.current)
-        channelRef.current = null
-      }
+      streamMap.current = {}
+      roomRef.current?.disconnect()
+      roomRef.current = null
     }
   }, [meetingId, userId, enabled])
 
-  // ── Controls ──────────────────────────────────────────────────
-
-  const toggleAudio = useCallback(() => {
-    const track = localRef.current?.getAudioTracks()[0]
-    if (!track) return
-    track.enabled = !track.enabled
-    setAudioEnabled(track.enabled)
+  // ── Controls ───────────────────────────────────────────────────────────────
+  const toggleAudio = useCallback(async () => {
+    const room = roomRef.current
+    if (!room) return
+    const next = !room.localParticipant.isMicrophoneEnabled
+    await room.localParticipant.setMicrophoneEnabled(next).catch(() => {})
+    if (mounted.current) setAudioEnabled(next)
   }, [])
 
-  const toggleVideo = useCallback(() => {
-    const track = localRef.current?.getVideoTracks()[0]
-    if (!track) return
-    track.enabled = !track.enabled
-    setVideoEnabled(track.enabled)
+  const toggleVideo = useCallback(async () => {
+    const room = roomRef.current
+    if (!room) return
+    const next = !room.localParticipant.isCameraEnabled
+    await room.localParticipant.setCameraEnabled(next).catch(() => {})
+    if (mounted.current) {
+      setVideoEnabled(next)
+      // Rebuild localStream so VideoTile reflects the toggled track state
+      const ms = new MediaStream()
+      room.localParticipant.trackPublications.forEach(pub => {
+        if (pub.track && (pub.kind === Track.Kind.Video || pub.kind === Track.Kind.Audio)) {
+          try { ms.addTrack(pub.track.mediaStreamTrack) } catch {}
+        }
+      })
+      setLocalStream(ms.getTracks().length ? ms : null)
+    }
   }, [])
 
   const startScreenShare = useCallback(async () => {
+    const room = roomRef.current
+    if (!room) return
     try {
-      const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false })
-      const screenTrack  = screenStream.getVideoTracks()[0]
-      const cameraTrack  = localRef.current?.getVideoTracks()[0]
-
-      origTrack.current = cameraTrack
-
-      // Replace the video track in every peer connection
-      Object.values(pcs.current).forEach(pc => {
-        const sender = pc.getSenders().find(s => s.track?.kind === 'video')
-        sender?.replaceTrack(screenTrack).catch(() => {})
-      })
-
-      // Swap in local stream copy so the preview updates
-      if (localRef.current && cameraTrack) {
-        localRef.current.removeTrack(cameraTrack)
-        localRef.current.addTrack(screenTrack)
-        setLocalStream(new MediaStream(localRef.current.getTracks()))
-      }
-
-      screenTrack.addEventListener('ended', () => stopScreenShare(), { once: true })
-      setScreenSharing(true)
-    } catch {
-      // User cancelled the picker
-    }
+      await room.localParticipant.setScreenShareEnabled(true)
+      if (mounted.current) setScreenSharing(true)
+    } catch {}
   }, [])
 
   const stopScreenShare = useCallback(async () => {
-    const cameraTrack = origTrack.current
-    if (!cameraTrack) return
-
-    const screenTrack = localRef.current?.getVideoTracks()[0]
-    screenTrack?.stop()
-
-    Object.values(pcs.current).forEach(pc => {
-      const sender = pc.getSenders().find(s => s.track?.kind === 'video')
-      sender?.replaceTrack(cameraTrack).catch(() => {})
-    })
-
-    if (localRef.current && screenTrack) {
-      localRef.current.removeTrack(screenTrack)
-      localRef.current.addTrack(cameraTrack)
-      setLocalStream(new MediaStream(localRef.current.getTracks()))
-    }
-
-    origTrack.current = null
-    setScreenSharing(false)
+    const room = roomRef.current
+    if (!room) return
+    await room.localParticipant.setScreenShareEnabled(false).catch(() => {})
+    if (mounted.current) setScreenSharing(false)
   }, [])
 
   const leave = useCallback(() => {
-    Object.keys(pcs.current).forEach(id => { pcs.current[id]?.close() })
-    pcs.current = {}
-    localRef.current?.getTracks().forEach(t => t.stop())
-    channelRef.current?.untrack().catch(() => {})
-    supabase.removeChannel(channelRef.current)
-    channelRef.current = null
+    streamMap.current = {}
+    roomRef.current?.disconnect()
+    roomRef.current = null
   }, [])
 
+  const setTxQuality       = useCallback(() => {}, [])
+  const requestQualityFrom = useCallback(() => {}, [])
+
   return {
-    localStream, peers, audioEnabled, videoEnabled, screenSharing,
-    status, mediaError,
+    localStream, peers, audioEnabled, videoEnabled, screenSharing, status, mediaError,
     toggleAudio, toggleVideo, startScreenShare, stopScreenShare, leave,
+    setTxQuality, requestQualityFrom, QUALITY,
   }
 }

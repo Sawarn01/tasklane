@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { useState, useEffect } from 'react'
 import { useAuth } from './lib/AuthContext'
 import SignUp from './pages/SignUp'
 import Login from './pages/Login'
@@ -25,6 +26,7 @@ import MeetingRoom from './pages/MeetingRoom'
 import Onboarding from './pages/Onboarding'
 import Projects from './pages/Projects'
 import Finances from './pages/Finances'
+import ProjectDocs from './pages/ProjectDocs'
 
 function PrivateRoute({ children }) {
   const { user, loading } = useAuth()
@@ -39,6 +41,28 @@ function PrivateRoute({ children }) {
     </div>
   )
   if (!user) return <Navigate to="/login" />
+  return children
+}
+
+function OwnerRoute({ children }) {
+  const { user, loading } = useAuth()
+  const [ready,   setReady]   = useState(false)
+  const [isOwner, setIsOwner] = useState(false)
+
+  useEffect(() => {
+    if (!user) return
+    import('./lib/data').then(({ getMyOrg }) =>
+      getMyOrg().then(({ role }) => { setIsOwner(role === 'owner'); setReady(true) }).catch(() => setReady(true))
+    )
+  }, [user])
+
+  if (loading || !ready) return (
+    <div className="min-h-screen flex items-center justify-center bg-paper">
+      <p className="font-mono text-xs text-slate-muted uppercase tracking-wider animate-pulse">Loading…</p>
+    </div>
+  )
+  if (!user) return <Navigate to="/login" />
+  if (!isOwner) return <Navigate to="/dashboard" replace />
   return children
 }
 
@@ -62,7 +86,7 @@ function App() {
         <Route path="/finances"      element={<PrivateRoute><Finances /></PrivateRoute>} />
         <Route path="/my-work"       element={<PrivateRoute><MyWork /></PrivateRoute>} />
         <Route path="/notifications" element={<PrivateRoute><Notifications /></PrivateRoute>} />
-        <Route path="/billing" element={<PrivateRoute><Billing /></PrivateRoute>} />
+        <Route path="/billing" element={<OwnerRoute><Billing /></OwnerRoute>} />
         <Route path="/profile" element={<PrivateRoute><UserProfile /></PrivateRoute>} />
         <Route path="/org/settings" element={<PrivateRoute><OrgSettings /></PrivateRoute>} />
 
@@ -80,6 +104,7 @@ function App() {
           <Route path="settings" element={<ProjectSettings />} />
           <Route path="chat"     element={<ProjectChat />} />
           <Route path="meetings" element={<Meetings />} />
+          <Route path="docs"     element={<ProjectDocs />} />
           <Route path="activity" element={<ProjectActivity />} />
         </Route>
       </Routes>

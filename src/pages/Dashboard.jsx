@@ -6,7 +6,7 @@ import {
   getMyOrg,
   getProjectsWithStats, getMyAssignedTasks, getMyOrgActivity,
   getMyNotifications, markNotificationRead, markAllNotificationsRead,
-  getOrgMembers, getProjectKey, getMyProfile,
+  getOrgMembers, getProjectKey, getMyProfile, createTask,
 } from '../lib/data'
 import { supabase } from '../lib/supabase'
 import { signOut } from '../lib/auth'
@@ -93,6 +93,136 @@ function RecentProjectCard({ project, index, onClick }) {
   )
 }
 
+// ── Project health card ───────────────────────────────────────
+function ProjectHealthCard({ project, index, onClick }) {
+  const pct      = project.totalTasks > 0 ? Math.round((project.doneTasks / project.totalTasks) * 100) : 0
+  const overdue  = project.overdueTasks || 0
+  const key      = getProjectKey(project.name)
+  const health   = overdue > 2 ? 'at-risk' : pct >= 70 ? 'healthy' : pct >= 30 ? 'progressing' : 'starting'
+  const hCfg     = {
+    'healthy':     { dot: 'bg-sage',        label: 'Healthy',     text: 'text-sage' },
+    'progressing': { dot: 'bg-amber-400',   label: 'In progress', text: 'text-amber-500' },
+    'at-risk':     { dot: 'bg-red-400',     label: 'At risk',     text: 'text-red-400' },
+    'starting':    { dot: 'bg-slate-300',   label: 'Starting',    text: 'text-slate-muted' },
+  }[health]
+  return (
+    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3, delay: 0.3 + index * 0.06 }}
+      whileHover={{ y: -1, transition: { duration: 0.12 } }}
+      onClick={onClick}
+      className="bg-white rounded-xl border border-black/5 px-4 py-3.5 cursor-pointer group hover:shadow-sm transition-shadow flex flex-col gap-2.5">
+      <div className="flex items-start justify-between">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-lg bg-violet/10 flex items-center justify-center shrink-0">
+            <span className="font-bold text-violet text-[9px]">{key}</span>
+          </div>
+          <div>
+            <p className="font-medium text-ink text-sm group-hover:text-violet transition-colors leading-tight">{project.name}</p>
+            <p className="text-[10px] text-slate-muted">{project.totalTasks} issues</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <div className={`w-1.5 h-1.5 rounded-full ${hCfg.dot}`} />
+          <span className={`text-[10px] font-mono ${hCfg.text}`}>{hCfg.label}</span>
+        </div>
+      </div>
+      <div className="space-y-1">
+        <div className="flex items-center justify-between text-[10px] text-slate-muted">
+          <span>{pct}% complete</span>
+          {overdue > 0 && <span className="text-red-400">{overdue} overdue</span>}
+        </div>
+        <div className="h-1.5 bg-paper-dim rounded-full overflow-hidden">
+          <motion.div initial={{ width: 0 }} animate={{ width: `${pct}%` }}
+            transition={{ duration: 0.7, delay: 0.35 + index * 0.06 }}
+            className="h-full rounded-full"
+            style={{ background: pct >= 70 ? '#36D399' : pct >= 30 ? '#F59E0B' : '#6E56CF' }} />
+        </div>
+      </div>
+    </motion.div>
+  )
+}
+
+// ── Quick task create modal ───────────────────────────────────
+function QuickTaskModal({ projects, userId, onClose, onCreated }) {
+  const [title,     setTitle]     = useState('')
+  const [projectId, setProjectId] = useState(projects[0]?.id || '')
+  const [priority,  setPriority]  = useState('medium')
+  const [saving,    setSaving]    = useState(false)
+  const [err,       setErr]       = useState('')
+  const inputRef = useRef(null)
+
+  useEffect(() => { inputRef.current?.focus() }, [])
+
+  useEffect(() => {
+    function onKey(e) { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  async function handleSubmit(e) {
+    e.preventDefault()
+    if (!title.trim() || !projectId) return
+    setSaving(true); setErr('')
+    try {
+      await createTask({ projectId, title, userId, status: 'todo', priority })
+      onCreated()
+    } catch (e) { setErr(e.message) }
+    finally { setSaving(false) }
+  }
+
+  const ic = 'w-full text-sm bg-paper-dim border border-black/6 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-violet/25'
+  return (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 bg-ink/40 backdrop-blur-sm flex items-start justify-center pt-28 px-4"
+      onClick={onClose}>
+      <motion.div initial={{ scale: 0.95, y: -8 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, opacity: 0 }}
+        transition={{ duration: 0.16 }}
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6"
+        onClick={e => e.stopPropagation()}>
+        <h3 className="font-semibold text-ink mb-4 flex items-center gap-2">
+          <span className="w-5 h-5 bg-violet rounded-md flex items-center justify-center">
+            <svg width="9" height="9" viewBox="0 0 9 9" fill="none"><path d="M4.5 1v7M1 4.5h7" stroke="white" strokeWidth="1.4" strokeLinecap="round" /></svg>
+          </span>
+          Quick create task
+        </h3>
+        {err && <p className="text-xs text-red-500 bg-red-50 rounded-lg px-3 py-2 mb-3">{err}</p>}
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <div>
+            <input ref={inputRef} required value={title} onChange={e => setTitle(e.target.value)}
+              placeholder="Task title…"
+              className="w-full text-sm bg-paper-dim border border-black/6 rounded-xl px-3 py-3 focus:outline-none focus:ring-2 focus:ring-violet/25 placeholder:text-slate-muted/40 font-medium" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-[10px] font-mono uppercase tracking-wider text-slate-muted mb-1">Project</label>
+              <select required className={ic} value={projectId} onChange={e => setProjectId(e.target.value)}>
+                {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-[10px] font-mono uppercase tracking-wider text-slate-muted mb-1">Priority</label>
+              <select className={ic} value={priority} onChange={e => setPriority(e.target.value)}>
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+                <option value="urgent">Urgent</option>
+              </select>
+            </div>
+          </div>
+          <div className="flex gap-2 pt-1">
+            <motion.button whileTap={{ scale: 0.97 }} type="submit" disabled={saving || !title.trim()}
+              className="flex-1 bg-violet text-white text-sm rounded-xl py-2.5 font-medium hover:bg-violet/90 disabled:opacity-40 transition-colors">
+              {saving ? 'Creating…' : 'Create task'}
+            </motion.button>
+            <button type="button" onClick={onClose} className="px-4 text-sm text-slate-muted hover:text-ink transition-colors">Cancel</button>
+          </div>
+        </form>
+        <p className="text-[10px] text-slate-muted/50 mt-3 text-center">Press Esc to close · ⌘K to open anytime</p>
+      </motion.div>
+    </motion.div>
+  )
+}
+
 // ── Notification destination helper ──────────────────────────
 function notifDestination(n) {
   if (n.type === 'chat_message') return `/projects/${n.project_id}/chat`
@@ -149,6 +279,12 @@ function NotificationsPanel({ notifications, onSelect, onMarkAll, onClose }) {
           </motion.div>
         ))}
       </div>
+      <button
+        onClick={() => { onClose(); navigate('/notifications') }}
+        className="w-full py-2.5 text-xs text-slate-muted hover:text-violet hover:bg-paper-dim transition-colors border-t border-black/5"
+      >
+        View all notifications →
+      </button>
     </motion.div>
   )
 }
@@ -191,6 +327,7 @@ export default function Dashboard() {
   const [error, setError]           = useState('')
 
   const [showNewProject,  setShowNewProject]  = useState(false)
+  const [showQuickTask,   setShowQuickTask]   = useState(false)
   const [showNotifs,      setShowNotifs]      = useState(false)
   const [showProfileMenu, setShowProfileMenu] = useState(false)
   const profileMenuRef = useRef(null)
@@ -209,6 +346,18 @@ export default function Dashboard() {
     }
     document.addEventListener('mousedown', handleClick)
     return () => document.removeEventListener('mousedown', handleClick)
+  }, [])
+
+  // ⌘K / Ctrl+K → quick task create
+  useEffect(() => {
+    function onKey(e) {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault()
+        setShowQuickTask(p => !p)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
   }, [])
 
   // Real-time: prepend incoming notifications so the badge updates live
@@ -325,6 +474,14 @@ export default function Dashboard() {
             </p>
           </div>
           <div className="flex items-center gap-2">
+            {/* Quick create task */}
+            <motion.button whileTap={{ scale: 0.95 }}
+              onClick={() => setShowQuickTask(true)}
+              className="flex items-center gap-1.5 bg-violet text-white text-xs px-3 py-1.5 rounded-xl font-medium hover:bg-violet/90 transition-colors mr-1">
+              <svg width="9" height="9" viewBox="0 0 9 9" fill="none"><path d="M4.5 1v7M1 4.5h7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>
+              New task
+              <span className="text-[9px] opacity-60 font-mono ml-0.5">⌘K</span>
+            </motion.button>
             {/* Notifications bell */}
             <div ref={notifsRef} className="relative">
               <motion.button
@@ -436,12 +593,12 @@ export default function Dashboard() {
                           icon: <><circle cx="6" cy="6" r="2" stroke="currentColor" strokeWidth="1.2" /><path d="M6 1v1M6 10v1M1 6h1M10 6h1M2.1 2.1l.7.7M9.2 9.2l.7.7M9.2 2.8l-.7.7M2.8 9.2l-.7.7" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" /></>,
                           fill: false,
                         }] : []),
-                        {
+                        ...(role === 'owner' ? [{
                           label: 'Billing',
                           onClick: () => { setShowProfileMenu(false); navigate('/billing') },
                           icon: <><rect x="1" y="2.5" width="10" height="7" rx="1.2" stroke="currentColor" strokeWidth="1.2" fill="none" /><path d="M1 5.5h10" stroke="currentColor" strokeWidth="1.2" /><rect x="2.5" y="7" width="2.5" height="1.2" rx="0.5" fill="currentColor" /></>,
                           fill: false,
-                        },
+                        }] : []),
                       ].map((item) => (
                         <button
                           key={item.label}
@@ -642,13 +799,16 @@ export default function Dashboard() {
             </motion.div>
           )}
 
-          {/* Recent projects teaser */}
+          {/* Project health overview */}
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4 }}>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="font-semibold text-ink">Recent projects</h2>
+              <div>
+                <h2 className="font-semibold text-ink">Project health</h2>
+                <p className="text-[11px] text-slate-muted mt-0.5">Completion, pace, and overdue issues</p>
+              </div>
               <button onClick={() => navigate('/projects')}
                 className="text-xs text-violet hover:opacity-70 transition-opacity flex items-center gap-1">
-                View all
+                All projects
                 <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
                   <path d="M2 5h6M5 2l3 3-3 3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
@@ -673,22 +833,17 @@ export default function Dashboard() {
                 </button>
               </motion.div>
             ) : (
-              <div className="space-y-2">
-                {projects.slice(0, 3).map((p, i) => (
-                  <RecentProjectCard key={p.id} project={p} index={i} onClick={() => navigate(`/projects/${p.id}`)} />
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {projects.slice(0, 6).map((p, i) => (
+                  <ProjectHealthCard key={p.id} project={p} index={i} onClick={() => navigate(`/projects/${p.id}`)} />
                 ))}
-                <motion.button initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-                  transition={{ delay: 0.5 }}
-                  onClick={() => navigate('/projects')}
-                  className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-dashed border-black/8 text-slate-muted hover:text-violet hover:border-violet/30 transition-colors text-sm">
-                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                    <rect x="1" y="1" width="4" height="4" rx="0.8" stroke="currentColor" strokeWidth="1.2" />
-                    <rect x="7" y="1" width="4" height="4" rx="0.8" stroke="currentColor" strokeWidth="1.2" />
-                    <rect x="1" y="7" width="4" height="4" rx="0.8" stroke="currentColor" strokeWidth="1.2" />
-                    <rect x="7" y="7" width="4" height="4" rx="0.8" stroke="currentColor" strokeWidth="1.2" />
-                  </svg>
-                  View all {projects.length} projects
-                </motion.button>
+                {projects.length > 6 && (
+                  <motion.button initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.55 }}
+                    onClick={() => navigate('/projects')}
+                    className="bg-white rounded-xl border border-dashed border-black/8 flex items-center justify-center text-slate-muted hover:text-violet hover:border-violet/30 transition-colors text-sm py-4">
+                    +{projects.length - 6} more projects
+                  </motion.button>
+                )}
               </div>
             )}
           </motion.div>
@@ -703,6 +858,14 @@ export default function Dashboard() {
             userId={user?.id}
             onCreated={() => { setShowNewProject(false); loadAll() }}
             onClose={() => setShowNewProject(false)}
+          />
+        )}
+        {showQuickTask && projects.length > 0 && (
+          <QuickTaskModal
+            projects={projects}
+            userId={user?.id}
+            onClose={() => setShowQuickTask(false)}
+            onCreated={() => { setShowQuickTask(false); loadAll() }}
           />
         )}
       </AnimatePresence>

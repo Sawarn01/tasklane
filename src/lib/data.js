@@ -1138,21 +1138,39 @@ export async function deleteMeeting(meetingId) {
 export async function getMeetingActionItems(meetingId) {
   const { data, error } = await supabase
     .from('meeting_action_items')
-    .select('*, profiles!meeting_action_items_assignee_id_fkey(full_name)')
+    .select('*')
     .eq('meeting_id', meetingId)
     .order('created_at', { ascending: true })
   if (error) return []
-  return data
+
+  // assignee_id → auth.users (not public.profiles), so PostgREST can't join.
+  // Batch-fetch names separately and merge to preserve the profiles?.full_name shape.
+  const ids = [...new Set(data.map(d => d.assignee_id).filter(Boolean))]
+  let nameMap = {}
+  if (ids.length) {
+    const { data: profiles } = await supabase.from('profiles').select('id, full_name').in('id', ids)
+    profiles?.forEach(p => { nameMap[p.id] = p.full_name })
+  }
+  return data.map(d => ({
+    ...d,
+    profiles: d.assignee_id ? { full_name: nameMap[d.assignee_id] ?? null } : null,
+  }))
 }
 
 export async function createActionItem({ meetingId, projectId, title, assigneeId, userId }) {
   const { data, error } = await supabase
     .from('meeting_action_items')
     .insert({ meeting_id: meetingId, project_id: projectId, title, assignee_id: assigneeId || null, created_by: userId, done: false })
-    .select('*, profiles!meeting_action_items_assignee_id_fkey(full_name)')
+    .select('*')
     .single()
   if (error) throw error
-  return data
+
+  let profiles = null
+  if (assigneeId) {
+    const { data: p } = await supabase.from('profiles').select('full_name').eq('id', assigneeId).maybeSingle()
+    profiles = p
+  }
+  return { ...data, profiles }
 }
 
 export async function toggleActionItem({ itemId, done }) {
@@ -1161,6 +1179,45 @@ export async function toggleActionItem({ itemId, done }) {
     .update({ done })
     .eq('id', itemId)
   if (error) throw error
+}
+
+export async function completeMeeting({ meetingId, durationSeconds, recordingPath, transcript }) {
+  const patch = { status: 'completed', completed_at: new Date().toISOString() }
+  if (durationSeconds != null) patch.duration_seconds = durationSeconds
+  if (recordingPath) patch.recording_url = recordingPath
+  if (transcript)   patch.transcript    = transcript
+  const { error } = await supabase.from('meetings').update(patch).eq('id', meetingId)
+  if (error) throw error
+}
+
+export async function uploadMeetingRecording({ meetingId, blob }) {
+  // MediaRecorder gives 'video/webm;codecs=vp9,opus' — strip codecs so it
+  // matches the bucket's allowed_mime_types ('video/webm', not the codec variant).
+  const contentType = blob.type.split(';')[0] || 'video/webm'
+  const ext  = contentType.includes('webm') ? 'webm' : 'mp4'
+  const path = `${meetingId}/rec-${Date.now()}.${ext}`
+  const { error } = await supabase.storage
+    .from('meeting-recordings')
+    .upload(path, blob, { contentType, upsert: true })
+  if (error) throw error
+  return path
+}
+
+export async function getMeetingRecordingUrl(storagePath) {
+  if (!storagePath) return null
+  const { data, error } = await supabase.storage
+    .from('meeting-recordings')
+    .createSignedUrl(storagePath, 3600 * 24 * 7)
+  if (error) return null
+  return data.signedUrl
+}
+
+export async function getLiveKitToken({ roomName, displayName }) {
+  const { data, error } = await supabase.functions.invoke('livekit-token', {
+    body: { roomName, displayName },
+  })
+  if (error) throw error
+  return data.token
 }
 
 export async function actionItemToTask({ item, projectId, userId }) {
@@ -1247,4 +1304,247 @@ export async function createSubtask({ parentTaskId, projectId, title, userId, as
     .single()
   if (error) throw error
   return data
+}
+
+// ==================== FINANCES ====================
+
+export async function getNextInvoiceNumber(orgId) {
+  const { data } = await supabase
+    .from('invoices')
+    .select('invoice_number')
+    .eq('org_id', orgId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .single()
+  if (!data) return 'INV-0001'
+  const match = data.invoice_number?.match(/(\d+)$/)
+  if (!match) return 'INV-0001'
+  return `INV-${String(parseInt(match[1]) + 1).padStart(4, '0')}`
+}
+
+export async function getOrgInvoices(orgId) {
+  const { data, error } = await supabase
+    .from('invoices')
+    .select('*')
+    .eq('org_id', orgId)
+    .order('created_at', { ascending: false })
+  if (error) throw error
+  return data || []
+}
+
+export async function saveInvoice({ orgId, userId, inv, existingId }) {
+  const subtotal  = inv.items.reduce((s, it) => s + it.qty * it.rate, 0)
+  const taxAmt    = subtotal * (inv.taxRate / 100)
+  const discAmt   = subtotal * (inv.discount / 100)
+  const total     = subtotal + taxAmt - discAmt
+
+  const payload = {
+    org_id:          orgId,
+    invoice_number:  inv.number,
+    client_name:     inv.client.name,
+    client_email:    inv.client.email    || null,
+    client_address:  inv.client.address  || null,
+    client_city:     inv.client.city     || null,
+    client_country:  inv.client.country  || null,
+    items:           inv.items.map(({ id: _id, ...rest }) => rest),
+    currency:        inv.currency,
+    tax_rate:        inv.taxRate,
+    discount:        inv.discount,
+    subtotal,
+    tax_amount:      taxAmt,
+    discount_amount: discAmt,
+    total,
+    status:          inv.status || 'draft',
+    notes:           inv.notes  || null,
+    issue_date:      inv.issueDate,
+    due_date:        inv.dueDate || null,
+    created_by:      userId,
+  }
+
+  if (existingId) {
+    const { data, error } = await supabase
+      .from('invoices').update(payload).eq('id', existingId).select().single()
+    if (error) throw error
+    return data
+  } else {
+    const { data, error } = await supabase
+      .from('invoices').insert(payload).select().single()
+    if (error) throw error
+    return data
+  }
+}
+
+export async function updateInvoiceStatus({ invoiceId, status }) {
+  const patch = { status }
+  if (status === 'paid') patch.paid_at = new Date().toISOString()
+  if (status === 'sent') patch.sent_at = new Date().toISOString()
+  const { error } = await supabase.from('invoices').update(patch).eq('id', invoiceId)
+  if (error) throw error
+}
+
+export async function deleteInvoice(invoiceId) {
+  const { error } = await supabase.from('invoices').delete().eq('id', invoiceId)
+  if (error) throw error
+}
+
+export async function getOrgExpenses(orgId) {
+  const { data, error } = await supabase
+    .from('expenses')
+    .select('*')
+    .eq('org_id', orgId)
+    .order('date', { ascending: false })
+  if (error) throw error
+  return data || []
+}
+
+export async function createExpense({ orgId, userId, category, description, amount, currency, vendor, date }) {
+  const { data, error } = await supabase
+    .from('expenses')
+    .insert({
+      org_id:      orgId,
+      category,
+      description,
+      amount:      Number(amount),
+      currency:    currency || 'USD',
+      vendor:      vendor   || null,
+      date,
+      created_by:  userId,
+    })
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function deleteExpense(expenseId) {
+  const { error } = await supabase.from('expenses').delete().eq('id', expenseId)
+  if (error) throw error
+}
+
+export async function getRevenueSnapshots(orgId) {
+  const { data, error } = await supabase
+    .from('revenue_snapshots')
+    .select('*')
+    .eq('org_id', orgId)
+    .order('month', { ascending: true })
+    .limit(12)
+  if (error) throw error
+  return data || []
+}
+
+export async function upsertRevenueSnapshot({ orgId, month, revenue, expenses }) {
+  const { data, error } = await supabase
+    .from('revenue_snapshots')
+    .upsert(
+      { org_id: orgId, month, revenue: Number(revenue), expenses: Number(expenses) },
+      { onConflict: 'org_id,month' }
+    )
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+// ==================== PROJECT DOCS ====================
+
+export async function getProjectDocs(projectId) {
+  const { data, error } = await supabase
+    .from('project_docs')
+    .select('id, title, emoji, created_by, updated_by, created_at, updated_at')
+    .eq('project_id', projectId)
+    .order('updated_at', { ascending: false })
+  if (error) throw error
+  return data || []
+}
+
+export async function getProjectDoc(docId) {
+  const { data, error } = await supabase
+    .from('project_docs')
+    .select('*')
+    .eq('id', docId)
+    .single()
+  if (error) throw error
+
+  // Fetch the author name separately from profiles (updated_by is a user id)
+  if (data?.updated_by) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('full_name')
+      .eq('id', data.updated_by)
+      .maybeSingle()
+    data.profiles = profile || null
+  }
+
+  return data
+}
+
+export async function createDoc({ projectId, userId, title = 'Untitled', body = '', emoji = '📄' }) {
+  const { data, error } = await supabase
+    .from('project_docs')
+    .insert({ project_id: projectId, title, body, emoji, created_by: userId, updated_by: userId })
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function updateDoc({ docId, userId, title, body, emoji }) {
+  const patch = { updated_by: userId }
+  if (title !== undefined) patch.title = title
+  if (body  !== undefined) patch.body  = body
+  if (emoji !== undefined) patch.emoji = emoji
+  const { data, error } = await supabase
+    .from('project_docs')
+    .update(patch)
+    .eq('id', docId)
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function deleteDoc(docId) {
+  const { error } = await supabase.from('project_docs').delete().eq('id', docId)
+  if (error) throw error
+}
+
+// ── Doc file attachments ─────────────────────────────────────────
+export async function getDocFiles(docId) {
+  const { data, error } = await supabase
+    .from('doc_files')
+    .select('*')
+    .eq('doc_id', docId)
+    .order('created_at', { ascending: true })
+  if (error) throw error
+  return data || []
+}
+
+export async function uploadDocFile({ docId, userId, file }) {
+  const ext  = file.name.split('.').pop()
+  const path = `${docId}/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`
+  const { error: upErr } = await supabase.storage
+    .from('doc-files')
+    .upload(path, file, { contentType: file.type, upsert: false })
+  if (upErr) throw upErr
+
+  const { data, error } = await supabase
+    .from('doc_files')
+    .insert({ doc_id: docId, uploaded_by: userId, name: file.name, storage_path: path, mime_type: file.type, size_bytes: file.size })
+    .select('*')
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function deleteDocFile({ fileId, storagePath }) {
+  await supabase.storage.from('doc-files').remove([storagePath])
+  const { error } = await supabase.from('doc_files').delete().eq('id', fileId)
+  if (error) throw error
+}
+
+export async function getDocFileUrl(storagePath) {
+  const { data, error } = await supabase.storage
+    .from('doc-files')
+    .createSignedUrl(storagePath, 3600 * 24 * 7)
+  if (error) return null
+  return data.signedUrl
 }

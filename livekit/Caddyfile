@@ -1,0 +1,5 @@
+# Replace livekit.yourdomain.com with your actual subdomain.
+# Caddy provisions a Let's Encrypt cert automatically — no certbot needed.
+livekit.yourdomain.com {
+    reverse_proxy localhost:7880
+}

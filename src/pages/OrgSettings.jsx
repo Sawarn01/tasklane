@@ -432,12 +432,22 @@ export default function OrgSettings() {
               <span className="text-xs text-slate-muted">{memberCount} members · {adminCount} admins</span>
             </div>
           </div>
-          <button
-            onClick={() => navigate('/billing')}
-            className="text-xs text-violet hover:opacity-70 transition-opacity shrink-0"
-          >
-            Manage plan →
-          </button>
+          {role === 'owner' ? (
+            <button
+              onClick={() => navigate('/billing')}
+              className="text-xs text-violet hover:opacity-70 transition-opacity shrink-0"
+            >
+              Manage plan →
+            </button>
+          ) : (
+            <span className="text-[10px] font-mono text-slate-muted/50 shrink-0 flex items-center gap-1">
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                <rect x="1.5" y="4.5" width="7" height="5" rx="1" stroke="currentColor" strokeWidth="1.1" />
+                <path d="M3 4.5V3a2 2 0 1 1 4 0v1.5" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" />
+              </svg>
+              Owner only
+            </span>
+          )}
         </motion.div>
 
         {/* ── General ───────────────────────────────────── */}
